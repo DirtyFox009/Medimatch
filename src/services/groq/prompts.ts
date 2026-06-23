@@ -21,7 +21,11 @@ EMERGENCY PROTOCOL:
 
 ASSESSMENT OUTPUT:
 After completing the conversation, output a JSON block on its own line — no surrounding prose, no markdown fences, just the raw JSON:
-{"severity":"Mild","conditions":["condition1","condition2"],"firstAid":"concise advice","recommendation":"what to do next","specialty":"most relevant medical specialty","language":"en"}
+{"severity":"Mild","conditions":["condition1","condition2"],"firstAid":"concise advice","recommendation":"what to do next","specialty":"Cardiology","language":"en"}
+
+For the "specialty" field use EXACTLY one of these values (no other strings allowed):
+General Medicine | Cardiology | Pediatrics | Gynecology | Orthopedics | ENT | Dermatology | Neurology | Gastroenterology | Psychiatry | Ophthalmology | Urology
+If chest/respiratory: Cardiology. If children: Pediatrics. If joint/bone: Orthopedics. If skin: Dermatology. If unclear: General Medicine.
 
 Severity levels:
 - Mild: manageable at home with rest and OTC medications; see a doctor within a week

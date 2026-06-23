@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, FlatList, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -7,18 +7,31 @@ import { DoctorCard } from '../../src/components/doctors/DoctorCard';
 import { DoctorFilter } from '../../src/components/doctors/DoctorFilter';
 import { DoctorCardSkeleton } from '../../src/components/ui/Skeleton';
 import { useDoctors } from '../../src/hooks/useDoctors';
+import { useChatStore } from '../../src/store/chatStore';
 import type { DoctorFilter as DoctorFilterType } from '../../src/types/doctor';
 import type { Specialty } from '../../src/types/doctor';
 
 export default function DoctorsScreen() {
   const { t } = useTranslation();
   const params = useLocalSearchParams<{ specialty?: string }>();
+  const { pendingSpecialty, setPendingSpecialty } = useChatStore();
 
   const [filter, setFilter] = useState<DoctorFilterType>({
     specialty: (params.specialty as Specialty) ?? '',
     division: '',
     telemedicineOnly: false,
   });
+
+  // Apply specialty written by SeverityCard. useEffect (not useFocusEffect) is used
+  // because bottom tabs stay mounted — the Zustand value updates before the re-render
+  // that would refresh useFocusEffect's callbackRef, so we react to the store value
+  // directly instead of relying on focus-event timing.
+  useEffect(() => {
+    if (pendingSpecialty) {
+      setFilter((f) => ({ ...f, specialty: pendingSpecialty as Specialty }));
+      setPendingSpecialty(null);
+    }
+  }, [pendingSpecialty]);
 
   const { doctors, loading, error, refetch } = useDoctors(filter);
 

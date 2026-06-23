@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SeverityBadge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { useChatStore } from '../../store/chatStore';
 import type { TriageResult } from '../../types/chat';
 import type { Specialty } from '../../types/doctor';
 
@@ -18,17 +19,59 @@ const DISCLAIMER_EN =
 const DISCLAIMER_BN =
   '⚠️ এটি চিকিৎসা নির্ণয় নয়। সঠিক মূল্যায়ন ও চিকিৎসার জন্য একজন লাইসেন্সপ্রাপ্ত ডাক্তারের পরামর্শ নিন।';
 
+// Valid Specialty union values — must match SPECIALTIES constant exactly
+const VALID_SPECIALTIES = new Set([
+  'General Medicine', 'Cardiology', 'Pediatrics', 'Gynecology', 'Orthopedics',
+  'ENT', 'Dermatology', 'Neurology', 'Gastroenterology', 'Psychiatry',
+  'Ophthalmology', 'Urology',
+]);
+
+// Maps Groq-returned specialty strings to valid Specialty union values.
+// Any unmapped string falls back to VALID_SPECIALTIES check, then null.
+const SPECIALTY_MAP: Record<string, string> = {
+  'Pulmonology': 'Cardiology',
+  'Pulmonologist': 'Cardiology',
+  'Respiratory Medicine': 'Cardiology',
+  'Emergency Medicine': 'General Medicine',
+  'Internal Medicine': 'General Medicine',
+  'General Physician': 'General Medicine',
+  'General Practitioner': 'General Medicine',
+  'Cardiologist': 'Cardiology',
+  'Pediatrician': 'Pediatrics',
+  'Gynecologist': 'Gynecology',
+  'Obstetrics': 'Gynecology',
+  'Orthopedic': 'Orthopedics',
+  'Orthopedic Specialist': 'Orthopedics',
+  'Rheumatology': 'Orthopedics',
+  'Otolaryngology': 'ENT',
+  'Dermatologist': 'Dermatology',
+  'Neurologist': 'Neurology',
+  'Gastroenterologist': 'Gastroenterology',
+  'Hepatology': 'Gastroenterology',
+  'Psychiatrist': 'Psychiatry',
+  'Mental Health': 'Psychiatry',
+  'Ophthalmologist': 'Ophthalmology',
+  'Urologist': 'Urology',
+  'Nephrology': 'Urology',
+};
+
 export function SeverityCard({ result, suggestedSpecialty }: SeverityCardProps) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { setPendingSpecialty } = useChatStore();
   const disclaimer = result.language === 'bn' ? DISCLAIMER_BN : DISCLAIMER_EN;
 
   const handleFindDoctors = () => {
+    let mapped: string | null = null;
     if (suggestedSpecialty) {
-      router.push({ pathname: '/(tabs)/doctors', params: { specialty: suggestedSpecialty } });
-    } else {
-      router.push('/(tabs)/doctors');
+      const candidate = SPECIALTY_MAP[suggestedSpecialty as string] ?? suggestedSpecialty;
+      // Only use the value if it's a valid Specialty the filter can recognise
+      mapped = VALID_SPECIALTIES.has(candidate) ? candidate : null;
     }
+    // Store the specialty in Zustand so the doctors tab can read it on focus.
+    // Route params are unreliable for already-mounted bottom tab screens.
+    setPendingSpecialty(mapped);
+    router.push('/(tabs)/doctors');
   };
 
   return (

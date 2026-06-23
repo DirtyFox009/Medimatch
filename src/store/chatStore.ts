@@ -10,6 +10,9 @@ interface ChatState {
   currentQuestionIndex: number;
   answers: Record<string, string>;
   qaComplete: boolean;
+  chatMode: 'qa' | 'free';
+  chatLang: 'en' | 'bn';
+  pendingSpecialty: string | null;
   addMessage: (msg: ChatMessage) => void;
   updateLastAssistantMessage: (content: string) => void;
   setTriageResult: (result: TriageResult, specialty: Specialty | null) => void;
@@ -18,6 +21,9 @@ interface ChatState {
   setAnswer: (questionKey: string, answer: string) => void;
   nextQuestion: () => void;
   completeQA: () => void;
+  setChatMode: (mode: 'qa' | 'free') => void;
+  setChatLang: (lang: 'en' | 'bn') => void;
+  setPendingSpecialty: (specialty: string | null) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -28,6 +34,9 @@ export const useChatStore = create<ChatState>((set) => ({
   currentQuestionIndex: 0,
   answers: {},
   qaComplete: false,
+  chatMode: 'qa',
+  chatLang: 'en',
+  pendingSpecialty: null,
 
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
 
@@ -45,7 +54,7 @@ export const useChatStore = create<ChatState>((set) => ({
   setStreaming: (isStreaming) => set({ isStreaming }),
 
   reset: () =>
-    set({
+    set((s) => ({
       messages: [],
       triageResult: null,
       suggestedSpecialty: null,
@@ -53,7 +62,9 @@ export const useChatStore = create<ChatState>((set) => ({
       currentQuestionIndex: 0,
       answers: {},
       qaComplete: false,
-    }),
+      chatMode: 'qa',
+      chatLang: s.chatLang, // language persists across resets
+    })),
 
   setAnswer: (questionKey, answer) =>
     set((s) => ({ answers: { ...s.answers, [questionKey]: answer } })),
@@ -62,4 +73,10 @@ export const useChatStore = create<ChatState>((set) => ({
     set((s) => ({ currentQuestionIndex: s.currentQuestionIndex + 1 })),
 
   completeQA: () => set({ qaComplete: true }),
+
+  setChatMode: (chatMode) => set({ chatMode }),
+
+  setChatLang: (chatLang) => set({ chatLang }),
+
+  setPendingSpecialty: (pendingSpecialty) => set({ pendingSpecialty }),
 }));

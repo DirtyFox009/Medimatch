@@ -35,7 +35,8 @@ export default function RegisterScreen() {
     try {
       await signUp(data.email, data.password, data.displayName);
     } catch (e: any) {
-      Alert.alert('Registration failed', e.message ?? 'Could not create account');
+      const code = e.code ? `[${e.code}]` : '';
+      Alert.alert('Registration failed', `${code} ${e.message ?? 'Could not create account'}`.trim());
     } finally {
       setLoading(false);
     }

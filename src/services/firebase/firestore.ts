@@ -23,20 +23,20 @@ import type { MedicineReminder } from '../../types/medicine';
 // ── Doctors ──────────────────────────────────────────────────────────────────
 
 export async function getDoctors(filter: DoctorFilter = {}): Promise<Doctor[]> {
-  const constraints: QueryConstraint[] = [];
+  // Fetch all doctors ordered by rating, filter on client to avoid composite indexes
+  const snap = await getDocs(
+    query(collection(db, 'doctors'), orderBy('ratingAvg', 'desc'), limit(100))
+  );
+  let doctors = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Doctor));
 
-  if (filter.specialty) constraints.push(where('specialty', '==', filter.specialty));
-  if (filter.division) constraints.push(where('division', '==', filter.division));
-  if (filter.telemedicineOnly) constraints.push(where('telemedicineAvailable', '==', true));
-  constraints.push(where('isAvailable', '==', true));
-  constraints.push(orderBy('ratingAvg', 'desc'));
-  constraints.push(limit(50));
+  // Client-side filtering
+  doctors = doctors.filter((d) => d.isAvailable);
+  if (filter.specialty) doctors = doctors.filter((d) => d.specialty === filter.specialty);
+  if (filter.division) doctors = doctors.filter((d) => d.division === filter.division);
+  if (filter.telemedicineOnly) doctors = doctors.filter((d) => d.telemedicineAvailable);
+  if (filter.maxFee) doctors = doctors.filter((d) => d.consultationFee <= filter.maxFee!);
 
-  const snap = await getDocs(query(collection(db, 'doctors'), ...constraints));
-  const doctors = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Doctor));
-
-  if (filter.maxFee) return doctors.filter((d) => d.consultationFee <= filter.maxFee!);
-  return doctors;
+  return doctors.slice(0, 50);
 }
 
 export async function getDoctor(id: string): Promise<Doctor | null> {

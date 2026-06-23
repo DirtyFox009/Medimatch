@@ -15,21 +15,26 @@ export async function signUp(
   password: string,
   displayName: string,
 ): Promise<User> {
-  const { user } = await createUserWithEmailAndPassword(auth, email, password);
-  await updateProfile(user, { displayName });
-  await setDoc(doc(db, 'users', user.uid), {
-    uid: user.uid,
-    displayName,
-    email,
-    phone: null,
-    preferredLang: 'en',
-    division: '',
-    fcmToken: null,
-    privacyAccepted: true,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return user;
+  try {
+    const { user } = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(user, { displayName });
+    await setDoc(doc(db, 'users', user.uid), {
+      uid: user.uid,
+      displayName,
+      email,
+      phone: null,
+      preferredLang: 'en',
+      division: '',
+      fcmToken: null,
+      privacyAccepted: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return user;
+  } catch (error: any) {
+    console.error('[signUp] Firebase error — code:', error.code, '| message:', error.message);
+    throw error;
+  }
 }
 
 export async function signIn(email: string, password: string): Promise<User> {

@@ -18,7 +18,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
     const inAuth = segments[0] === '(auth)';
-    if (!isAuthenticated && !inAuth) {
+    const isPublicRoute = segments[0] === 'emergency' || segments[0] === 'privacy';
+    if (!isAuthenticated && !inAuth && !isPublicRoute) {
       router.replace('/(auth)/login');
     } else if (isAuthenticated && inAuth) {
       router.replace('/(tabs)/home');

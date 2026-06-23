@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getDoctors, getDoctor, getDoctorReviews } from '../services/firebase/firestore';
+import { useAuth } from './useAuth';
 import type { Doctor, DoctorFilter, Review } from '../types/doctor';
 
 export function useDoctors(filter: DoctorFilter = {}) {
+  const { isAuthenticated } = useAuth();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -10,17 +12,22 @@ export function useDoctors(filter: DoctorFilter = {}) {
   const filterKey = JSON.stringify(filter);
 
   const load = useCallback(async () => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const data = await getDoctors(filter);
       setDoctors(data);
     } catch (e) {
+      console.error('[useDoctors] error:', e);
       setError('Failed to load doctors');
     } finally {
       setLoading(false);
     }
-  }, [filterKey]);
+  }, [filterKey, isAuthenticated]);
 
   useEffect(() => {
     load();

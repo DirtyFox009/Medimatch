@@ -7,11 +7,17 @@ interface ChatState {
   triageResult: TriageResult | null;
   suggestedSpecialty: Specialty | null;
   isStreaming: boolean;
+  currentQuestionIndex: number;
+  answers: Record<string, string>;
+  qaComplete: boolean;
   addMessage: (msg: ChatMessage) => void;
   updateLastAssistantMessage: (content: string) => void;
   setTriageResult: (result: TriageResult, specialty: Specialty | null) => void;
   setStreaming: (streaming: boolean) => void;
   reset: () => void;
+  setAnswer: (questionKey: string, answer: string) => void;
+  nextQuestion: () => void;
+  completeQA: () => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -19,6 +25,9 @@ export const useChatStore = create<ChatState>((set) => ({
   triageResult: null,
   suggestedSpecialty: null,
   isStreaming: false,
+  currentQuestionIndex: 0,
+  answers: {},
+  qaComplete: false,
 
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
 
@@ -41,5 +50,16 @@ export const useChatStore = create<ChatState>((set) => ({
       triageResult: null,
       suggestedSpecialty: null,
       isStreaming: false,
+      currentQuestionIndex: 0,
+      answers: {},
+      qaComplete: false,
     }),
+
+  setAnswer: (questionKey, answer) =>
+    set((s) => ({ answers: { ...s.answers, [questionKey]: answer } })),
+
+  nextQuestion: () =>
+    set((s) => ({ currentQuestionIndex: s.currentQuestionIndex + 1 })),
+
+  completeQA: () => set({ qaComplete: true }),
 }));

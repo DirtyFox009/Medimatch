@@ -5,6 +5,7 @@ const config = getDefaultConfig(__dirname);
 
 // Prevent react-leaflet and leaflet from being bundled into native builds
 const NATIVE_EXCLUDED = ['react-leaflet', 'leaflet'];
+const { resolveRequest: defaultResolveRequest } = config.resolver ?? {};
 config.resolver = {
   ...config.resolver,
   resolveRequest: (context, moduleName, platform) => {
@@ -13,6 +14,9 @@ config.resolver = {
       NATIVE_EXCLUDED.some((pkg) => moduleName === pkg || moduleName.startsWith(pkg + '/'))
     ) {
       return { type: 'empty' };
+    }
+    if (defaultResolveRequest) {
+      return defaultResolveRequest(context, moduleName, platform);
     }
     return context.resolveRequest(context, moduleName, platform);
   },

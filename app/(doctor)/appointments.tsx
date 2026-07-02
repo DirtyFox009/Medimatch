@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, SectionList, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, SectionList, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,7 @@ import {
   cancelAppointment,
 } from '../../src/services/firebase/firestore';
 import { useAuth } from '../../src/hooks/useAuth';
+import { showAlert } from '../../src/utils/alert';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import { formatAppointmentDate } from '../../src/utils/formatDate';
 import type { Appointment } from '../../src/types/appointment';
@@ -57,14 +58,14 @@ export default function DoctorAppointmentsScreen() {
     try {
       await fn();
     } catch {
-      Alert.alert(t('common.error'));
+      showAlert(t('common.error'));
     } finally {
       setBusyId(null);
     }
   };
 
   const handleCancel = (appointment: Appointment) => {
-    Alert.alert(t('appointments.cancel_appointment'), t('appointments.cancel_confirm'), [
+    showAlert(t('appointments.cancel_appointment'), t('appointments.cancel_confirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.confirm'),

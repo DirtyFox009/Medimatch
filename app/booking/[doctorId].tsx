@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { bookAppointment, subscribeBookedSlots } from '../../src/services/firebase/firestore';
 import { scheduleAppointmentReminder } from '../../src/services/notifications/appointmentReminders';
 import { getAvailableDates, formatAppointmentDate } from '../../src/utils/formatDate';
+import { showAlert } from '../../src/utils/alert';
 import { useChatStore } from '../../src/store/chatStore';
 import type { AppointmentType } from '../../src/types/appointment';
 
@@ -79,10 +80,10 @@ export default function BookingScreen() {
     } catch (e: any) {
       if (e.message === 'SLOT_TAKEN') {
         // The slot subscription refreshes availability automatically.
-        Alert.alert('Slot unavailable', t('booking.slot_taken'));
+        showAlert('Slot unavailable', t('booking.slot_taken'));
         setSelectedSlot(null);
       } else {
-        Alert.alert('Error', 'Could not confirm booking. Please try again.');
+        showAlert('Error', 'Could not confirm booking. Please try again.');
       }
     } finally {
       setConfirming(false);

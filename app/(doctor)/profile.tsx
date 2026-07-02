@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Switch, Alert } from 'react-native';
+import { View, Text, ScrollView, Switch } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../../src/components/ui/Card';
@@ -8,6 +8,7 @@ import { Button } from '../../src/components/ui/Button';
 import { getDoctor, updateDoctorAvailability } from '../../src/services/firebase/firestore';
 import { signOut } from '../../src/services/firebase/auth';
 import { useAuth } from '../../src/hooks/useAuth';
+import { showAlert } from '../../src/utils/alert';
 import type { Doctor } from '../../src/types/doctor';
 
 export default function DoctorProfileScreen() {
@@ -30,7 +31,7 @@ export default function DoctorProfileScreen() {
       await updateDoctorAvailability(doctor.id, value);
     } catch {
       setDoctor({ ...doctor, isAvailable: !value });
-      Alert.alert(t('common.error'));
+      showAlert(t('common.error'));
     } finally {
       setSaving(false);
     }

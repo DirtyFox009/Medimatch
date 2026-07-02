@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { Badge } from '../../src/components/ui/Badge';
 import { getUserRecords, addRecord, deleteRecord } from '../../src/services/firebase/firestore';
 import { uploadMedicalFile } from '../../src/services/firebase/storage';
 import { useAuth } from '../../src/hooks/useAuth';
+import { showAlert } from '../../src/utils/alert';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import type { MedicalRecord, RecordType } from '../../src/types/record';
 
@@ -99,7 +100,7 @@ export default function RecordsScreen() {
       };
       setRecords((prev) => [newRecord, ...prev]);
     } catch (e) {
-      Alert.alert('Upload failed', 'Could not upload file. Please try again.');
+      showAlert('Upload failed', 'Could not upload file. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -107,7 +108,7 @@ export default function RecordsScreen() {
 
   const handleDelete = (record: MedicalRecord) => {
     if (!user) return;
-    Alert.alert(t('common.delete'), t('records.delete_confirm'), [
+    showAlert(t('common.delete'), t('records.delete_confirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),

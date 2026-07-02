@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Input } from '../../src/components/ui/Input';
 import { Button } from '../../src/components/ui/Button';
 import { signUp } from '../../src/services/firebase/auth';
+import { showAlert } from '../../src/utils/alert';
 
 interface RegisterForm {
   displayName: string;
@@ -28,7 +29,7 @@ export default function RegisterScreen() {
 
   const onSubmit = async (data: RegisterForm) => {
     if (!data.privacyAccepted) {
-      Alert.alert('Privacy Policy', t('auth.privacy_required'));
+      showAlert('Privacy Policy', t('auth.privacy_required'));
       return;
     }
     setLoading(true);
@@ -36,7 +37,7 @@ export default function RegisterScreen() {
       await signUp(data.email, data.password, data.displayName);
     } catch (e: any) {
       const code = e.code ? `[${e.code}]` : '';
-      Alert.alert('Registration failed', `${code} ${e.message ?? 'Could not create account'}`.trim());
+      showAlert('Registration failed', `${code} ${e.message ?? 'Could not create account'}`.trim());
     } finally {
       setLoading(false);
     }

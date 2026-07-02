@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/Button';
 import { submitReview } from '../../services/firebase/firestore';
 import { useAuth } from '../../hooks/useAuth';
+import { showAlert } from '../../utils/alert';
 import type { Appointment } from '../../types/appointment';
 
 interface ReviewModalProps {
@@ -34,7 +35,7 @@ export function ReviewModal({ appointment, onClose, onSubmitted }: ReviewModalPr
       reset();
       onClose();
     } catch {
-      Alert.alert(t('common.error'));
+      showAlert(t('common.error'));
     } finally {
       setSubmitting(false);
     }

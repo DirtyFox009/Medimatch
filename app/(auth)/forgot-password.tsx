@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, ScrollView, Platform, Alert } from 'react-native';
+import { View, Text, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import { Link } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { Input } from '../../src/components/ui/Input';
 import { Button } from '../../src/components/ui/Button';
 import { resetPassword } from '../../src/services/firebase/auth';
+import { showAlert } from '../../src/utils/alert';
 
 interface ForgotPasswordForm {
   email: string;
@@ -27,7 +28,7 @@ export default function ForgotPasswordScreen() {
       // Don't reveal whether the email exists; generic failure only for
       // malformed emails / network issues.
       if (e?.code === 'auth/invalid-email') {
-        Alert.alert(t('auth.reset_password'), t('auth.reset_invalid_email'));
+        showAlert(t('auth.reset_password'), t('auth.reset_invalid_email'));
       } else {
         setSent(true);
       }

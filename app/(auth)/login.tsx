@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { Input } from '../../src/components/ui/Input';
 import { Button } from '../../src/components/ui/Button';
 import { signIn } from '../../src/services/firebase/auth';
+import { showAlert } from '../../src/utils/alert';
 
 interface LoginForm {
   email: string;
@@ -25,7 +26,7 @@ export default function LoginScreen() {
       await signIn(data.email, data.password);
       // AuthGate in _layout handles redirect
     } catch (e: any) {
-      Alert.alert('Login failed', e.message ?? 'Invalid email or password');
+      showAlert('Login failed', e.message ?? 'Invalid email or password');
     } finally {
       setLoading(false);
     }

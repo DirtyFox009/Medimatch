@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +12,7 @@ import { ReviewModal } from '../../src/components/reviews/ReviewModal';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import { useAuth } from '../../src/hooks/useAuth';
 import { formatAppointmentDate } from '../../src/utils/formatDate';
+import { showAlert } from '../../src/utils/alert';
 import type { Appointment } from '../../src/types/appointment';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -57,7 +58,7 @@ export default function AppointmentsScreen() {
   const displayed = tab === 'upcoming' ? upcoming : past;
 
   const handleCancel = (appointment: Appointment) => {
-    Alert.alert(
+    showAlert(
       t('appointments.cancel_appointment'),
       t('appointments.cancel_confirm'),
       [

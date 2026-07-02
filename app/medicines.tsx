@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Platform, View, Text, FlatList, TouchableOpacity, Alert, Modal, ScrollView, Switch } from 'react-native';
+import { Platform, View, Text, FlatList, TouchableOpacity, Modal, ScrollView, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 // Conditionally required so Metro excludes expo-notifications from the web bundle —
@@ -14,6 +14,7 @@ import { Button } from '../src/components/ui/Button';
 import { Input } from '../src/components/ui/Input';
 import { getUserMedicines, saveMedicine, updateMedicine, deleteMedicine } from '../src/services/firebase/firestore';
 import { useAuth } from '../src/hooks/useAuth';
+import { showAlert } from '../src/utils/alert';
 import type { MedicineReminder, ReminderFrequency } from '../src/types/medicine';
 
 const FREQUENCY_OPTIONS: { value: ReminderFrequency; times: string[] }[] = [
@@ -117,7 +118,7 @@ export default function MedicinesScreen() {
 
   const handleDelete = (med: MedicineReminder) => {
     if (!user) return;
-    Alert.alert(t('common.delete'), t('medicines.delete_confirm'), [
+    showAlert(t('common.delete'), t('medicines.delete_confirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),

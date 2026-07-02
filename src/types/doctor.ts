@@ -35,6 +35,9 @@ export interface Doctor {
   telemedicineAvailable: boolean;
   isAvailable: boolean;
   bio: string;
+  /** Auth uid of the provisioned doctor portal account, set by provisionDoctorAccounts.ts. */
+  userId?: string | null;
+  email?: string;
   createdAt: Date;
   updatedAt: Date;
 }

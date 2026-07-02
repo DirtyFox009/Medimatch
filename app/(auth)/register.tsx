@@ -53,7 +53,7 @@ export default function RegisterScreen() {
           <Text className="text-primary-100 mt-1">{t('tagline')}</Text>
         </View>
 
-        <View className="px-6 pt-8 gap-5 pb-8">
+        <View className="px-6 pt-8 gap-5 pb-8 w-full md:max-w-md md:self-center">
           <Text className="text-2xl font-bold text-slate-800">{t('auth.register_title')}</Text>
 
           <Controller

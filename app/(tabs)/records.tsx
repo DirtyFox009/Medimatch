@@ -10,6 +10,7 @@ import { Badge } from '../../src/components/ui/Badge';
 import { getUserRecords, addRecord, deleteRecord } from '../../src/services/firebase/firestore';
 import { uploadMedicalFile } from '../../src/services/firebase/storage';
 import { useAuth } from '../../src/hooks/useAuth';
+import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import type { MedicalRecord, RecordType } from '../../src/types/record';
 
 const TYPE_COLORS: Record<RecordType, 'blue' | 'green' | 'amber' | 'teal'> = {
@@ -121,6 +122,7 @@ export default function RecordsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['bottom']}>
+      <ResponsiveContainer>
       {/* Upload buttons */}
       <View className="bg-white px-4 py-3 border-b border-slate-100">
         <Text className="text-xs text-slate-500 mb-2">{t('records.add_record')}</Text>
@@ -174,6 +176,7 @@ export default function RecordsScreen() {
           </Card>
         )}
       />
+      </ResponsiveContainer>
     </SafeAreaView>
   );
 }

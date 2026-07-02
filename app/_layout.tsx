@@ -11,20 +11,28 @@ import { useAuthListener, useAuth } from '../src/hooks/useAuth';
 SplashScreen.preventAutoHideAsync();
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, appUser } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
     if (isLoading) return;
     const inAuth = segments[0] === '(auth)';
+    const inDoctor = segments[0] === '(doctor)';
     const isPublicRoute = segments[0] === 'emergency' || segments[0] === 'privacy';
+    const isDoctor = appUser?.role === 'doctor';
+
     if (!isAuthenticated && !inAuth && !isPublicRoute) {
       router.replace('/(auth)/login');
     } else if (isAuthenticated && inAuth) {
+      router.replace(isDoctor ? '/(doctor)/appointments' : '/(tabs)/home');
+    } else if (isAuthenticated && isDoctor && segments[0] === '(tabs)') {
+      // Doctors live in their portal; telemedicine/emergency stay shared.
+      router.replace('/(doctor)/appointments');
+    } else if (isAuthenticated && !isDoctor && inDoctor) {
       router.replace('/(tabs)/home');
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, appUser?.role, segments]);
 
   return <>{children}</>;
 }
@@ -50,6 +58,7 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(doctor)" />
           <Stack.Screen name="doctor/[id]" options={{ headerShown: true, title: 'Doctor Profile', headerBackTitle: 'Back' }} />
           <Stack.Screen name="booking/[doctorId]" options={{ headerShown: true, title: 'Book Appointment', headerBackTitle: 'Back' }} />
           <Stack.Screen name="telemedicine/[appointmentId]" options={{ headerShown: true, title: 'Video Consultation' }} />

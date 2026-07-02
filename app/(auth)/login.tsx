@@ -43,7 +43,7 @@ export default function LoginScreen() {
           <Text className="text-primary-100 mt-1">{t('tagline')}</Text>
         </View>
 
-        <View className="px-6 pt-8 gap-5">
+        <View className="px-6 pt-8 gap-5 w-full md:max-w-md md:self-center">
           <View>
             <Text className="text-2xl font-bold text-slate-800">{t('auth.login_title')}</Text>
           </View>
@@ -84,6 +84,12 @@ export default function LoginScreen() {
               />
             )}
           />
+
+          <View className="flex-row justify-end">
+            <Link href="/(auth)/forgot-password">
+              <Text className="text-primary-600 font-medium">{t('auth.forgot_password')}</Text>
+            </Link>
+          </View>
 
           <Button
             title={t('auth.login')}

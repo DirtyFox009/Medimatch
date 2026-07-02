@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { onAuthChange, getUserProfile } from '../services/firebase/auth';
+import { registerForPushNotifications } from '../services/firebase/fcm';
 import { useAuthStore } from '../store/authStore';
 
 export function useAuthListener() {
@@ -11,6 +12,8 @@ export function useAuthListener() {
       if (user) {
         const profile = await getUserProfile(user.uid);
         setAppUser(profile);
+        // Best-effort: push tokens are unavailable in Expo Go / on web.
+        registerForPushNotifications(user.uid).catch(() => {});
       } else {
         setAppUser(null);
       }

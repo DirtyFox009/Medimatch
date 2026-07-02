@@ -1,10 +1,22 @@
-import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from './config';
-import { Platform } from 'react-native';
 
+// Conditionally required so Metro excludes expo-notifications from the web
+// bundle — the web polyfill fires unsupported-API warnings at import time.
+const Notifications =
+  Platform.OS !== 'web'
+    ? (require('expo-notifications') as typeof import('expo-notifications'))
+    : null;
+
+/**
+ * Stores the device's Expo push token on the user profile. Remote push needs
+ * a dev/EAS build (it's unavailable in Expo Go since SDK 53) and a sender
+ * backend, so today this is future-proofing — callers must treat failures as
+ * non-fatal.
+ */
 export async function registerForPushNotifications(userId: string): Promise<void> {
-  if (Platform.OS === 'web') return;
+  if (!Notifications) return;
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -20,7 +32,7 @@ export async function registerForPushNotifications(userId: string): Promise<void
   await updateDoc(doc(db, 'users', userId), { fcmToken: token });
 }
 
-Notifications.setNotificationHandler({
+Notifications?.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,

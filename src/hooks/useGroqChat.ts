@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
-import { groq, GROQ_MODEL } from '../services/groq/client';
-import { TRIAGE_SYSTEM_PROMPT } from '../services/groq/prompts';
+import { streamChatCompletion } from '../services/groq/client';
 import { parseTriageResult, extractSpecialty, stripTriageJson } from '../services/groq/triage';
 import { useChatStore } from '../store/chatStore';
 import type { ChatMessage } from '../types/chat';
@@ -35,26 +34,14 @@ export function useGroqChat() {
       setStreaming(true);
 
       try {
-        const stream = await groq.chat.completions.create({
-          model: GROQ_MODEL,
-          messages: [
-            { role: 'system', content: TRIAGE_SYSTEM_PROMPT },
-            ...[...messages, userMsg].map((m) => ({
-              role: m.role as 'user' | 'assistant',
-              content: m.content,
-            })),
-          ],
-          max_tokens: 1024,
-          temperature: 0.4,
-          stream: true,
-        });
-
-        let fullContent = '';
-        for await (const chunk of stream) {
-          const delta = chunk.choices[0]?.delta?.content ?? '';
-          fullContent += delta;
-          updateLastAssistantMessage(fullContent);
-        }
+        // System prompt is prepended server-side by the proxy (api/groq.ts).
+        const fullContent = await streamChatCompletion(
+          [...messages, userMsg].map((m) => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          })),
+          updateLastAssistantMessage,
+        );
 
         // Check for triage result in the completed response
         const triage = parseTriageResult(fullContent);

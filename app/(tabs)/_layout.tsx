@@ -1,10 +1,12 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { TouchableOpacity, View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import i18n from '../../src/i18n';
+import { DesktopShell, type ShellNavItem } from '../../src/components/layout/DesktopShell';
+import { useIsDesktop } from '../../src/hooks/useIsDesktop';
 
 function LanguageToggle() {
   const { i18n: i18nHook } = useTranslation();
@@ -33,13 +35,27 @@ function EmergencyButton() {
 
 export default function TabsLayout() {
   const { t } = useTranslation();
+  const isDesktop = useIsDesktop();
+  const segments = useSegments();
+  const activeTab = (segments[1] as string) ?? 'home';
 
-  return (
+  const navItems: ShellNavItem[] = [
+    { key: 'home', label: t('nav.home'), icon: 'home', route: '/(tabs)/home' },
+    { key: 'chat', label: t('nav.chat'), icon: 'chatbubble-ellipses', route: '/(tabs)/chat' },
+    { key: 'doctors', label: t('nav.doctors'), icon: 'people', route: '/(tabs)/doctors' },
+    { key: 'appointments', label: t('nav.appointments'), icon: 'calendar', route: '/(tabs)/appointments' },
+    { key: 'records', label: t('nav.records'), icon: 'folder', route: '/(tabs)/records' },
+  ];
+
+  const tabs = (
     <Tabs
       screenOptions={{
+        headerShown: !isDesktop,
         tabBarActiveTintColor: '#2563EB',
         tabBarInactiveTintColor: '#94A3B8',
-        tabBarStyle: { borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingBottom: 4 },
+        tabBarStyle: isDesktop
+          ? { display: 'none' }
+          : { borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingBottom: 4 },
         headerRight: () => (
           <View className="flex-row items-center">
             <EmergencyButton />
@@ -86,5 +102,17 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+  );
+
+  if (!isDesktop) return tabs;
+
+  return (
+    <DesktopShell
+      items={navItems}
+      activeKey={activeTab}
+      title={t(`nav.${activeTab}` as any, { defaultValue: t('nav.home') })}
+    >
+      {tabs}
+    </DesktopShell>
   );
 }

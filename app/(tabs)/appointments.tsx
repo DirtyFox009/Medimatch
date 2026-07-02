@@ -6,7 +6,10 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../../src/components/ui/Card';
 import { SeverityBadge } from '../../src/components/ui/Badge';
-import { getUserAppointments, cancelAppointment } from '../../src/services/firebase/firestore';
+import { subscribeUserAppointments, cancelAppointment, hasReviewed } from '../../src/services/firebase/firestore';
+import { cancelAppointmentReminder } from '../../src/services/notifications/appointmentReminders';
+import { ReviewModal } from '../../src/components/reviews/ReviewModal';
+import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import { useAuth } from '../../src/hooks/useAuth';
 import { formatAppointmentDate } from '../../src/utils/formatDate';
 import type { Appointment } from '../../src/types/appointment';
@@ -25,14 +28,29 @@ export default function AppointmentsScreen() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [reviewed, setReviewed] = useState<Record<string, boolean>>({});
+  const [reviewTarget, setReviewTarget] = useState<Appointment | null>(null);
 
+  // Real-time: doctor confirmations/completions appear without a refresh.
   useEffect(() => {
     if (!user) return;
-    getUserAppointments(user.uid).then((data) => {
+    const unsubscribe = subscribeUserAppointments(user.uid, (data) => {
       setAppointments(data);
       setLoading(false);
     });
+    return unsubscribe;
   }, [user]);
+
+  // Check which completed appointments already have a review (id == appointment id).
+  useEffect(() => {
+    const unchecked = appointments.filter((a) => a.status === 'completed' && reviewed[a.id] === undefined);
+    if (unchecked.length === 0) return;
+    Promise.all(
+      unchecked.map(async (a) => [a.id, await hasReviewed(a.doctorId, a.id)] as const),
+    ).then((entries) => {
+      setReviewed((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+    });
+  }, [appointments]);
 
   const upcoming = appointments.filter((a) => a.status === 'confirmed' || a.status === 'pending');
   const past = appointments.filter((a) => a.status === 'completed' || a.status === 'cancelled');
@@ -48,10 +66,9 @@ export default function AppointmentsScreen() {
           text: 'Yes, Cancel',
           style: 'destructive',
           onPress: async () => {
-            await cancelAppointment(appointment.id);
-            setAppointments((prev) =>
-              prev.map((a) => a.id === appointment.id ? { ...a, status: 'cancelled' } : a),
-            );
+            await cancelAppointment(appointment);
+            cancelAppointmentReminder(appointment.id);
+            // Snapshot listener delivers the status change.
           },
         },
       ],
@@ -60,6 +77,7 @@ export default function AppointmentsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['bottom']}>
+      <ResponsiveContainer>
       {/* Tab toggle */}
       <View className="flex-row bg-white border-b border-slate-100 px-4">
         {(['upcoming', 'past'] as const).map((tabKey) => (
@@ -134,11 +152,27 @@ export default function AppointmentsScreen() {
                     <Text className="text-red-500 text-xs font-medium">{t('common.cancel')}</Text>
                   </TouchableOpacity>
                 )}
+                {item.status === 'completed' && reviewed[item.id] === false && (
+                  <TouchableOpacity
+                    onPress={() => setReviewTarget(item)}
+                    className="bg-amber-500 rounded-lg px-3 py-1.5 flex-row items-center gap-1"
+                  >
+                    <Ionicons name="star" size={12} color="#fff" />
+                    <Text className="text-white text-xs font-medium">{t('reviews.rate_doctor')}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </Card>
         )}
       />
+
+      <ReviewModal
+        appointment={reviewTarget}
+        onClose={() => setReviewTarget(null)}
+        onSubmitted={(id) => setReviewed((prev) => ({ ...prev, [id]: true }))}
+      />
+      </ResponsiveContainer>
     </SafeAreaView>
   );
 }

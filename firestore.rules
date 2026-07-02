@@ -1,0 +1,109 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function authed() { return request.auth != null; }
+    function isOwner(uid) { return authed() && request.auth.uid == uid; }
+
+    // ── User profiles ────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      // Self-signup may only create a patient profile; doctor accounts are
+      // provisioned by the admin script (scripts/provisionDoctorAccounts.ts).
+      allow create: if isOwner(uid)
+        && request.resource.data.role == 'patient'
+        && request.resource.data.uid == uid;
+      // Role and doctor linkage can never be self-modified.
+      allow update: if isOwner(uid)
+        && request.resource.data.get('role', 'patient') == resource.data.get('role', 'patient')
+        && request.resource.data.get('doctorId', null) == resource.data.get('doctorId', null);
+      allow delete: if false;
+
+      match /records/{recordId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /medicines/{medicineId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // ── Doctors (seeded via admin SDK) ───────────────────────────────────
+    match /doctors/{doctorId} {
+      allow read: if authed();
+      // A doctor may toggle only their own availability.
+      allow update: if authed()
+        && resource.data.get('userId', '') == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['isAvailable', 'updatedAt']);
+      // Rating aggregation: any authed user may advance the rating fields by
+      // exactly one review. Runs in the same transaction as the review create
+      // below, whose rule enforces the completed-appointment requirement.
+      allow update: if authed()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['ratingAvg', 'reviewCount', 'updatedAt'])
+        && request.resource.data.reviewCount == resource.data.reviewCount + 1
+        && request.resource.data.ratingAvg >= 0
+        && request.resource.data.ratingAvg <= 5;
+      allow create, delete: if false;
+
+      // Public booking ledger — opaque slot occupancy, no health data.
+      match /slots/{slotId} {
+        allow read: if authed();
+        allow create: if authed()
+          && request.resource.data.bookedBy == request.auth.uid
+          && request.resource.data.keys().hasAll(['date', 'timeSlot', 'bookedBy', 'appointmentId']);
+        // Freed on cancellation by the patient who booked it, or by the
+        // doctor who owns this doctor profile.
+        allow delete: if authed()
+          && (resource.data.bookedBy == request.auth.uid
+              || get(/databases/$(database)/documents/doctors/$(doctorId)).data.get('userId', '') == request.auth.uid);
+        allow update: if false;
+      }
+
+      // Review id == appointmentId → exactly one review per appointment,
+      // and only for a completed appointment with this doctor.
+      match /reviews/{appointmentId} {
+        allow read: if authed();
+        allow create: if authed()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.rating is int
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          && request.resource.data.comment is string
+          && request.resource.data.comment.size() <= 1000
+          && get(/databases/$(database)/documents/appointments/$(appointmentId)).data.patientId == request.auth.uid
+          && get(/databases/$(database)/documents/appointments/$(appointmentId)).data.doctorId == doctorId
+          && get(/databases/$(database)/documents/appointments/$(appointmentId)).data.status == 'completed';
+        allow update, delete: if false;
+      }
+    }
+
+    // ── Appointments ─────────────────────────────────────────────────────
+    match /appointments/{appointmentId} {
+      allow read: if authed()
+        && (resource.data.patientId == request.auth.uid
+            || resource.data.get('doctorUserId', '') == request.auth.uid);
+      allow create: if authed()
+        && request.resource.data.patientId == request.auth.uid
+        && request.resource.data.status in ['pending', 'confirmed']
+        && request.resource.data.keys().hasAll(
+             ['patientId', 'doctorId', 'date', 'timeSlot', 'type', 'fee', 'status'])
+        && request.resource.data.type in ['in-person', 'telemedicine'];
+      // Patient may only cancel; doctor may confirm/complete/cancel.
+      allow update: if authed()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'updatedAt', 'notes'])
+        && (
+          (resource.data.patientId == request.auth.uid
+             && request.resource.data.status == 'cancelled')
+          || (resource.data.get('doctorUserId', '') == request.auth.uid
+             && request.resource.data.status in ['confirmed', 'completed', 'cancelled'])
+        );
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

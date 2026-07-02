@@ -3,7 +3,11 @@ import Constants from 'expo-constants';
 const extra = Constants.expoConfig?.extra ?? {};
 
 export const CONFIG = {
-  groqApiKey: (process.env.EXPO_PUBLIC_GROQ_API_KEY ?? extra.groqApiKey ?? '') as string,
+  // Groq requests are proxied through a Vercel serverless function so the API
+  // key never ships in a client bundle. See api/groq.ts.
+  groqProxyUrl: (process.env.EXPO_PUBLIC_GROQ_PROXY_URL ??
+    extra.groqProxyUrl ??
+    'https://medimatch.vercel.app/api/groq') as string,
   firebase: {
     apiKey: (process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '') as string,
     authDomain: (process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '') as string,

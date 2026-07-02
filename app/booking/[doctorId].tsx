@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Crypto from 'expo-crypto';
 import { Button } from '../../src/components/ui/Button';
 import { Card } from '../../src/components/ui/Card';
 import { Avatar } from '../../src/components/ui/Avatar';
 import { useDoctor } from '../../src/hooks/useDoctors';
 import { useAuth } from '../../src/hooks/useAuth';
-import { bookAppointment, getBookedSlots } from '../../src/services/firebase/firestore';
+import { bookAppointment, subscribeBookedSlots } from '../../src/services/firebase/firestore';
+import { scheduleAppointmentReminder } from '../../src/services/notifications/appointmentReminders';
 import { getAvailableDates, formatAppointmentDate } from '../../src/utils/formatDate';
 import { useChatStore } from '../../src/store/chatStore';
 import type { AppointmentType } from '../../src/types/appointment';
+
+function randomRoomId(): string {
+  const bytes = Crypto.getRandomBytes(12);
+  return 'mm-' + Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 export default function BookingScreen() {
   const { doctorId, type: initialType } = useLocalSearchParams<{ doctorId: string; type?: string }>();
@@ -34,10 +41,11 @@ export default function BookingScreen() {
 
   const availableDates = doctor ? getAvailableDates(doctor.availableDays, 14) : [];
 
+  // Live subscription: slots booked by other patients grey out in real time.
   useEffect(() => {
-    if (doctor && selectedDate) {
-      getBookedSlots(doctor.id, selectedDate).then(setBookedSlots);
-    }
+    if (!doctor || !selectedDate) return;
+    const unsubscribe = subscribeBookedSlots(doctor.id, selectedDate, setBookedSlots);
+    return unsubscribe;
   }, [doctor, selectedDate]);
 
   const fee = doctor ? (apptType === 'telemedicine' ? doctor.telemedicineFee : doctor.consultationFee) : 0;
@@ -46,9 +54,10 @@ export default function BookingScreen() {
     if (!user || !doctor || !selectedDate || !selectedSlot) return;
     setConfirming(true);
     try {
-      await bookAppointment({
+      const appointmentId = await bookAppointment({
         patientId: user.uid,
         doctorId: doctor.id,
+        doctorUserId: doctor.userId ?? null,
         doctorNameEn: doctor.nameEn,
         doctorNameBn: doctor.nameBn,
         specialty: doctor.specialty,
@@ -57,19 +66,21 @@ export default function BookingScreen() {
         timeSlot: selectedSlot,
         type: apptType,
         fee,
-        status: 'confirmed',
+        // Doctors confirm bookings from their portal.
+        status: 'pending',
         chatSummary: attachSymptoms && triageResult ? triageResult.recommendation : null,
         severity: attachSymptoms && triageResult ? triageResult.severity : null,
         notes: '',
-        telemedicineRoomId: apptType === 'telemedicine' ? `medimatch-${doctor.id}-${Date.now()}` : null,
+        telemedicineRoomId: apptType === 'telemedicine' ? randomRoomId() : null,
       });
+      // Best-effort local reminder 1h before the visit (no-op on web).
+      scheduleAppointmentReminder(appointmentId, selectedDate, selectedSlot, doctor.nameEn);
       setConfirmed(true);
     } catch (e: any) {
       if (e.message === 'SLOT_TAKEN') {
+        // The slot subscription refreshes availability automatically.
         Alert.alert('Slot unavailable', t('booking.slot_taken'));
         setSelectedSlot(null);
-        const fresh = await getBookedSlots(doctor.id, selectedDate);
-        setBookedSlots(fresh);
       } else {
         Alert.alert('Error', 'Could not confirm booking. Please try again.');
       }
@@ -84,25 +95,34 @@ export default function BookingScreen() {
 
   if (confirmed) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center px-6 gap-5">
-        <View className="w-20 h-20 rounded-full bg-green-100 items-center justify-center">
-          <Ionicons name="checkmark-circle" size={48} color="#16A34A" />
+      <SafeAreaView className="flex-1 bg-white px-6">
+        <View className="flex-1 items-center justify-center gap-5 w-full md:max-w-md md:self-center">
+          <View className="w-24 h-24 rounded-full bg-green-100 items-center justify-center">
+            <Ionicons name="checkmark" size={52} color="#16A34A" />
+          </View>
+          <Text className="text-2xl font-bold text-slate-800 text-center">{t('booking.booking_confirmed')}</Text>
+          <Text className="text-slate-500 text-center -mt-2">{t('booking.reminder_note')}</Text>
+          <Card className="w-full p-5 gap-4 mt-2">
+            <View className="flex-row justify-between"><Text className="text-slate-500">{t('booking.summary_doctor')}</Text><Text className="font-semibold text-slate-800">{doctor.nameEn}</Text></View>
+            <View className="flex-row justify-between"><Text className="text-slate-500">{t('booking.summary_specialty')}</Text><Text className="font-semibold text-slate-800">{doctor.specialty}</Text></View>
+            <View className="flex-row justify-between"><Text className="text-slate-500">{t('booking.summary_date')}</Text><Text className="font-semibold text-slate-800">{selectedDate ? formatAppointmentDate(selectedDate) : ''}</Text></View>
+            <View className="flex-row justify-between"><Text className="text-slate-500">{t('booking.summary_time')}</Text><Text className="font-semibold text-slate-800">{selectedSlot}</Text></View>
+            <View className="flex-row justify-between border-t border-slate-100 pt-3"><Text className="font-bold text-slate-700">{t('booking.total_fee')}</Text><Text className="font-bold text-primary-600">৳{fee}</Text></View>
+          </Card>
         </View>
-        <Text className="text-2xl font-bold text-slate-800 text-center">{t('booking.booking_confirmed')}</Text>
-        <Card className="w-full p-4 gap-3">
-          <View className="flex-row justify-between"><Text className="text-slate-500">Doctor</Text><Text className="font-semibold text-slate-800">{doctor.nameEn}</Text></View>
-          <View className="flex-row justify-between"><Text className="text-slate-500">Date</Text><Text className="font-semibold text-slate-800">{selectedDate ? formatAppointmentDate(selectedDate) : ''}</Text></View>
-          <View className="flex-row justify-between"><Text className="text-slate-500">Time</Text><Text className="font-semibold text-slate-800">{selectedSlot}</Text></View>
-          <View className="flex-row justify-between"><Text className="text-slate-500">Type</Text><Text className="font-semibold text-slate-800 capitalize">{apptType}</Text></View>
-          <View className="flex-row justify-between border-t border-slate-100 pt-3"><Text className="font-bold text-slate-700">{t('booking.total_fee')}</Text><Text className="font-bold text-primary-600">৳{fee}</Text></View>
-        </Card>
-        <Button title={t('booking.view_appointments')} onPress={() => router.replace('/(tabs)/appointments')} fullWidth />
+        <View className="pb-8 gap-3 w-full md:max-w-md md:self-center">
+          <Button title={t('booking.back_to_home')} onPress={() => router.replace('/(tabs)/home')} fullWidth size="lg" />
+          <TouchableOpacity onPress={() => router.replace('/(tabs)/appointments')}>
+            <Text className="text-primary-600 font-semibold text-center">{t('booking.view_appointments')}</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['bottom']}>
+      <View className="w-full max-w-[760px] flex-1 self-center">
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
         {/* Doctor summary */}
         <Card className="p-4 flex-row gap-3 items-center">
@@ -219,6 +239,7 @@ export default function BookingScreen() {
           fullWidth
           size="lg"
         />
+      </View>
       </View>
     </SafeAreaView>
   );

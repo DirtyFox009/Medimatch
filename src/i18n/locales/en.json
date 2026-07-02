@@ -41,10 +41,29 @@
     "no_account": "Don't have an account?",
     "have_account": "Already have an account?",
     "privacy_consent": "I agree to the Privacy Policy and Terms of Use",
-    "privacy_required": "You must accept the privacy policy to continue"
+    "privacy_required": "You must accept the privacy policy to continue",
+    "forgot_password": "Forgot password?",
+    "reset_password": "Reset password",
+    "reset_instructions": "Enter your email and we'll send you a link to reset your password.",
+    "send_reset_link": "Send reset link",
+    "reset_sent_title": "Check your inbox",
+    "reset_sent": "If an account exists for that email, a password reset link is on its way.",
+    "reset_invalid_email": "Please enter a valid email address.",
+    "back_to_login": "Back to log in",
+    "verify_email_banner": "Please verify your email address — check your inbox for the link.",
+    "resend": "Resend",
+    "verification_sent": "Sent ✓"
   },
   "home": {
     "greeting": "Hello, {{name}}",
+    "how_feeling": "How are you feeling today?",
+    "hero_tagline": "Your health, matched with the right care.",
+    "search_placeholder": "Search doctors, specialties...",
+    "ai_checker_title": "AI Symptom Checker",
+    "ai_checker_sub": "Tell us what's wrong, get matched instantly",
+    "specialties": "Specialties",
+    "top_doctors": "Top Doctors Near You",
+    "per_visit": "per visit",
     "check_symptoms": "Check Symptoms",
     "find_doctors": "Find Doctors",
     "my_appointments": "My Appointments",
@@ -103,6 +122,12 @@
     "confirm_booking": "Confirm Booking",
     "slot_taken": "This slot was just taken. Please choose another.",
     "booking_confirmed": "Appointment Confirmed!",
+    "reminder_note": "You'll receive a reminder before your visit",
+    "back_to_home": "Back to Home",
+    "summary_doctor": "Doctor",
+    "summary_specialty": "Specialty",
+    "summary_date": "Date",
+    "summary_time": "Time",
     "booking_details": "Booking Details",
     "total_fee": "Total Fee",
     "view_appointments": "View My Appointments"
@@ -178,5 +203,26 @@
   "privacy": {
     "title": "Privacy Policy",
     "last_updated": "Last updated: June 2026"
+  },
+  "doctor_portal": {
+    "dashboard": "Appointments",
+    "profile": "My Profile",
+    "today": "Today",
+    "upcoming": "Upcoming",
+    "past": "Past",
+    "confirm": "Confirm",
+    "mark_complete": "Mark Complete",
+    "join_call": "Join Call",
+    "severity": "Severity",
+    "availability": "Accepting bookings",
+    "available_for_booking": "Patients can find and book you while this is on",
+    "no_appointments_today": "No appointments today"
+  },
+  "reviews": {
+    "rate_doctor": "Rate Doctor",
+    "your_rating": "Your rating",
+    "comment_placeholder": "Share your experience (optional)...",
+    "submit": "Submit Review",
+    "thanks": "Thank you for your feedback!"
   }
 }

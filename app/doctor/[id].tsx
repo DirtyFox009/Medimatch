@@ -10,6 +10,7 @@ import { Button } from '../../src/components/ui/Button';
 import { Card } from '../../src/components/ui/Card';
 import { StarRating } from '../../src/components/doctors/StarRating';
 import { Skeleton } from '../../src/components/ui/Skeleton';
+import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import { useDoctor } from '../../src/hooks/useDoctors';
 
 export default function DoctorProfileScreen() {
@@ -34,6 +35,7 @@ export default function DoctorProfileScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['bottom']}>
+      <ResponsiveContainer>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Hero */}
         <View className="bg-white px-6 py-6 gap-4">
@@ -156,6 +158,7 @@ export default function DoctorProfileScreen() {
           />
         )}
       </View>
+      </ResponsiveContainer>
     </SafeAreaView>
   );
 }

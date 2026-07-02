@@ -6,6 +6,8 @@ export interface Appointment {
   id: string;
   patientId: string;
   doctorId: string;
+  /** Auth uid of the doctor's portal account (doctors/{doctorId}.userId). */
+  doctorUserId: string | null;
   doctorNameEn: string;
   doctorNameBn: string;
   specialty: string;

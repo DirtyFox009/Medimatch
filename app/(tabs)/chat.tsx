@@ -293,6 +293,8 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['bottom']}>
+      {/* Desktop: chat sits in a centered ~760px column (Figma 10:64). */}
+      <View className="w-full max-w-[800px] flex-1 self-center">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <View className="bg-white border-b border-slate-100">
@@ -428,6 +430,7 @@ export default function ChatScreen() {
       {/* ── Disclaimer ──────────────────────────────────────────────────────── */}
       <View className="px-4 py-2 bg-white">
         <Text className="text-center text-xs text-slate-400">{t('chat.disclaimer')}</Text>
+      </View>
       </View>
     </SafeAreaView>
   );

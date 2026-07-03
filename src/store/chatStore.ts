@@ -7,8 +7,12 @@ interface ChatState {
   triageResult: TriageResult | null;
   suggestedSpecialty: Specialty | null;
   isStreaming: boolean;
-  currentQuestionIndex: number;
+  // Adaptive guided flow: ordered question keys (from FLOWS) + current position.
+  // Path is empty until q1 is answered; q1 renders as the implicit first step.
+  questionPath: string[];
+  stepIndex: number;
   answers: Record<string, string>;
+  multiDraft: string[]; // in-progress multi-select toggles (English values)
   qaComplete: boolean;
   chatMode: 'qa' | 'free';
   chatLang: 'en' | 'bn';
@@ -19,7 +23,10 @@ interface ChatState {
   setStreaming: (streaming: boolean) => void;
   reset: () => void;
   setAnswer: (questionKey: string, answer: string) => void;
-  nextQuestion: () => void;
+  setPath: (path: string[]) => void;
+  advance: () => void;
+  goBack: () => void;
+  setMultiDraft: (draft: string[]) => void;
   completeQA: () => void;
   setChatMode: (mode: 'qa' | 'free') => void;
   setChatLang: (lang: 'en' | 'bn') => void;
@@ -31,8 +38,10 @@ export const useChatStore = create<ChatState>((set) => ({
   triageResult: null,
   suggestedSpecialty: null,
   isStreaming: false,
-  currentQuestionIndex: 0,
+  questionPath: [],
+  stepIndex: 0,
   answers: {},
+  multiDraft: [],
   qaComplete: false,
   chatMode: 'qa',
   chatLang: 'en',
@@ -59,8 +68,10 @@ export const useChatStore = create<ChatState>((set) => ({
       triageResult: null,
       suggestedSpecialty: null,
       isStreaming: false,
-      currentQuestionIndex: 0,
+      questionPath: [],
+      stepIndex: 0,
       answers: {},
+      multiDraft: [],
       qaComplete: false,
       chatMode: 'qa',
       chatLang: s.chatLang, // language persists across resets
@@ -69,8 +80,28 @@ export const useChatStore = create<ChatState>((set) => ({
   setAnswer: (questionKey, answer) =>
     set((s) => ({ answers: { ...s.answers, [questionKey]: answer } })),
 
-  nextQuestion: () =>
-    set((s) => ({ currentQuestionIndex: s.currentQuestionIndex + 1 })),
+  setPath: (questionPath) => set({ questionPath }),
+
+  advance: () => set((s) => ({ stepIndex: s.stepIndex + 1, multiDraft: [] })),
+
+  // Step back one question: drop that answer and the last user+assistant
+  // message pair (previous answer bubble + current question bubble).
+  goBack: () =>
+    set((s) => {
+      if (s.stepIndex === 0 || s.qaComplete) return s;
+      const newIdx = s.stepIndex - 1;
+      const key = s.questionPath[newIdx];
+      const answers = { ...s.answers };
+      delete answers[key];
+      return {
+        stepIndex: newIdx,
+        answers,
+        multiDraft: [],
+        messages: s.messages.slice(0, -2),
+      };
+    }),
+
+  setMultiDraft: (multiDraft) => set({ multiDraft }),
 
   completeQA: () => set({ qaComplete: true }),
 

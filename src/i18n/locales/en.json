@@ -85,6 +85,13 @@
     "find_matching_doctors": "Find Matching Doctors",
     "go_to_emergency": "Emergency — Call 999",
     "new_chat": "New Chat",
+    "back": "Back",
+    "done": "Done",
+    "describe_placeholder": "Briefly describe what's wrong...",
+    "what_to_do_next": "What To Do Next",
+    "top_doctors": "Top Doctors For You",
+    "see_all_doctors": "See All Matching Doctors",
+    "book": "Book",
     "mild": "Mild",
     "moderate": "Moderate",
     "severe": "Severe"

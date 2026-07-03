@@ -8,212 +8,34 @@ import { ChatInput } from '../../src/components/chat/ChatInput';
 import { SeverityCard } from '../../src/components/chat/SeverityCard';
 import { useGroqChat } from '../../src/hooks/useGroqChat';
 import { useChatStore } from '../../src/store/chatStore';
+import {
+  QUESTION_MAP,
+  FLOWS,
+  resolveOptions,
+  checkRedFlags,
+  buildEmergencyResult,
+  buildSummary,
+  type QOption,
+} from '../../src/constants/triageFlow';
 
 function makeId() {
   return Math.random().toString(36).slice(2);
 }
 
-// ─── Question definitions ────────────────────────────────────────────────────
-
-interface QOption {
-  en: string;
-  bn: string;
+const BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+function toBnDigits(n: number): string {
+  return String(n).replace(/\d/g, (d) => BN_DIGITS[Number(d)]);
 }
-
-interface QDef {
-  key: string;
-  text: { en: string; bn: string };
-  options: QOption[] | ((a: Record<string, string>) => QOption[]);
-}
-
-// Q2 sub-location options keyed by English Q1 value (answers are always stored in English)
-const Q2_OPTIONS: Record<string, QOption[]> = {
-  Chest: [
-    { en: 'Centre',     bn: 'মাঝখানে' },
-    { en: 'Left side',  bn: 'বাম পাশে' },
-    { en: 'Right side', bn: 'ডান পাশে' },
-    { en: 'All over',   bn: 'সব জায়গায়' },
-  ],
-  Stomach: [
-    { en: 'Upper',      bn: 'উপরে' },
-    { en: 'Lower',      bn: 'নিচে' },
-    { en: 'Left side',  bn: 'বাম পাশে' },
-    { en: 'Right side', bn: 'ডান পাশে' },
-  ],
-  Head: [
-    { en: 'Forehead',     bn: 'কপালে' },
-    { en: 'Back of head', bn: 'পেছনে' },
-    { en: 'One side',     bn: 'এক পাশে' },
-    { en: 'All over',     bn: 'সব জায়গায়' },
-  ],
-  Joints: [
-    { en: 'Knee',     bn: 'হাঁটু' },
-    { en: 'Hip',      bn: 'কোমর' },
-    { en: 'Shoulder', bn: 'কাঁধ' },
-    { en: 'Wrist',    bn: 'কব্জি' },
-    { en: 'Ankle',    bn: 'গোড়ালি' },
-  ],
-};
-
-// Q2 only appears when Q1 English answer is one of these four
-const Q2_TRIGGERS = new Set(['Chest', 'Stomach', 'Head', 'Joints']);
-
-const QUESTIONS: QDef[] = [
-  {
-    key: 'q1',
-    text: { en: "What's bothering you most right now?", bn: 'এখন সবচেয়ে বেশি কোথায় সমস্যা হচ্ছে?' },
-    options: [
-      { en: 'Chest',   bn: 'বুক' },
-      { en: 'Stomach', bn: 'পেট' },
-      { en: 'Head',    bn: 'মাথা' },
-      { en: 'Joints',  bn: 'হাড়/গাঁট' },
-      { en: 'Skin',    bn: 'চামড়া' },
-      { en: 'Eyes',    bn: 'চোখ' },
-      { en: 'Throat',  bn: 'গলা' },
-      { en: 'Back',    bn: 'পিঠ' },
-      { en: 'Other',   bn: 'অন্যান্য' },
-    ],
-  },
-  {
-    key: 'q2',
-    text: { en: 'Where exactly?', bn: 'ঠিক কোথায়?' },
-    options: (a) => Q2_OPTIONS[a.q1] ?? [],
-  },
-  {
-    key: 'q3',
-    text: { en: 'How long has this been going on?', bn: 'কতদিন ধরে এই সমস্যা?' },
-    options: [
-      { en: 'Started today',    bn: 'আজই শুরু' },
-      { en: '2–3 days',         bn: '২-৩ দিন' },
-      { en: 'About a week',     bn: 'প্রায় এক সপ্তাহ' },
-      { en: 'More than a week', bn: 'এক সপ্তাহের বেশি' },
-      { en: 'Over a month',     bn: 'এক মাসের বেশি' },
-    ],
-  },
-  {
-    key: 'q4',
-    text: { en: 'Did it start suddenly or gradually?', bn: 'হঠাৎ শুরু হয়েছে নাকি ধীরে ধীরে?' },
-    options: [
-      { en: 'Suddenly',       bn: 'হঠাৎ' },
-      { en: 'Gradually',      bn: 'ধীরে ধীরে' },
-      { en: 'Comes and goes', bn: 'আসে-যায়' },
-    ],
-  },
-  {
-    key: 'q5',
-    text: { en: 'How bad does it feel?', bn: 'ব্যথা বা সমস্যা কতটা তীব্র?' },
-    options: [
-      { en: 'Mild (bearable)',        bn: 'সামান্য (সহনীয়)' },
-      { en: 'Moderate (distracting)', bn: 'মাঝারি (বিরক্তিকর)' },
-      { en: 'Severe (unbearable)',    bn: 'তীব্র (অসহনীয়)' },
-    ],
-  },
-  {
-    key: 'q6',
-    text: { en: 'Does anything make it worse?', bn: 'কোন কারণে সমস্যা বাড়ে?' },
-    options: [
-      { en: 'Movement',         bn: 'নড়াচড়ায়' },
-      { en: 'Eating',           bn: 'খাবার পরে' },
-      { en: 'Stress',           bn: 'মানসিক চাপে' },
-      { en: 'Deep breathing',   bn: 'গভীর শ্বাসে' },
-      { en: 'Lying down',       bn: 'শুয়ে থাকলে' },
-      { en: 'Nothing specific', bn: 'কোনো কারণ নেই' },
-    ],
-  },
-  {
-    key: 'q7',
-    text: { en: 'Does anything make it better?', bn: 'কোন কারণে সমস্যা কমে?' },
-    options: [
-      { en: 'Rest',          bn: 'বিশ্রামে' },
-      { en: 'Medication',    bn: 'ওষুধে' },
-      { en: 'Heat or cold',  bn: 'গরম/ঠান্ডায়' },
-      { en: 'Food',          bn: 'খাবারে' },
-      { en: 'Nothing helps', bn: 'কোনোভাবেই কমে না' },
-    ],
-  },
-  {
-    key: 'q8',
-    text: { en: 'Any fever?', bn: 'জ্বর আছে কি?' },
-    options: [
-      { en: 'High fever', bn: 'বেশি জ্বর' },
-      { en: 'Mild fever', bn: 'হালকা জ্বর' },
-      { en: 'No fever',   bn: 'জ্বর নেই' },
-    ],
-  },
-  {
-    key: 'q9',
-    text: { en: 'Any of these also present?', bn: 'এর সাথে আর কিছু আছে?' },
-    options: [
-      { en: 'Nausea or vomiting',  bn: 'বমি বমি ভাব' },
-      { en: 'Fatigue or weakness', bn: 'দুর্বলতা/ক্লান্তি' },
-      { en: 'Dizziness',           bn: 'মাথা ঘোরা' },
-      { en: 'Shortness of breath', bn: 'শ্বাসকষ্ট' },
-      { en: 'None of these',       bn: 'আর কিছু নেই' },
-    ],
-  },
-  {
-    key: 'q10',
-    text: { en: 'Have you had this before?', bn: 'আগে এরকম হয়েছিল?' },
-    options: [
-      { en: 'Yes same thing',   bn: 'হ্যাঁ একই রকম' },
-      { en: 'Yes but different', bn: 'হ্যাঁ কিন্তু আলাদা' },
-      { en: 'No first time',    bn: 'না এই প্রথম' },
-    ],
-  },
-  {
-    key: 'q11',
-    text: { en: 'Any existing medical conditions?', bn: 'কোনো পুরনো রোগ আছে?' },
-    options: [
-      { en: 'Diabetes',      bn: 'ডায়াবেটিস' },
-      { en: 'Hypertension',  bn: 'উচ্চ রক্তচাপ' },
-      { en: 'Heart disease', bn: 'হৃদরোগ' },
-      { en: 'Asthma',        bn: 'হাঁপানি' },
-      { en: 'None',          bn: 'কোনোটিই না' },
-    ],
-  },
-  {
-    key: 'q12',
-    text: { en: 'Any medications currently?', bn: 'এখন কোনো ওষুধ খাচ্ছেন?' },
-    options: [
-      { en: 'Yes painkillers',       bn: 'হ্যাঁ ব্যথার ওষুধ' },
-      { en: 'Yes prescription meds', bn: 'হ্যাঁ ডাক্তারের ওষুধ' },
-      { en: 'No medications',        bn: 'না কোনো ওষুধ নেই' },
-    ],
-  },
-];
-
-function resolveOptions(q: QDef, answers: Record<string, string>): QOption[] {
-  return typeof q.options === 'function' ? q.options(answers) : q.options;
-}
-
-// Summary always built in English regardless of chatLang — Groq receives English
-function buildSummary(answers: Record<string, string>): string {
-  return [
-    `Main complaint: ${answers.q1}${answers.q2 ? ` (${answers.q2})` : ''}.`,
-    `Duration: ${answers.q3}.`,
-    `Onset: ${answers.q4}.`,
-    `Severity: ${answers.q5}.`,
-    `Worse with: ${answers.q6}.`,
-    `Better with: ${answers.q7}.`,
-    `Fever: ${answers.q8}.`,
-    `Other symptoms: ${answers.q9}.`,
-    `History: ${answers.q10}.`,
-    `Conditions: ${answers.q11}.`,
-    `Medications: ${answers.q12}.`,
-  ].join(' ');
-}
-
-// ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function ChatScreen() {
   const { t } = useTranslation();
   const { messages, triageResult, isStreaming, sendMessage } = useGroqChat();
   const {
     suggestedSpecialty, reset,
-    currentQuestionIndex, answers, qaComplete,
+    questionPath, stepIndex, answers, multiDraft, qaComplete,
     chatMode, chatLang,
-    addMessage, setAnswer, nextQuestion, completeQA,
-    setChatMode, setChatLang,
+    addMessage, updateLastAssistantMessage, setAnswer, setPath, advance, goBack, setMultiDraft, completeQA,
+    setChatMode, setChatLang, setTriageResult,
   } = useChatStore();
 
   const listRef = useRef<FlatList>(null);
@@ -221,17 +43,30 @@ export default function ChatScreen() {
 
   const isBn = chatLang === 'bn';
 
-  // Seed Q1 as the opening bot message (QA mode only, runs on mount and after reset)
+  // Current question: q1 until a complaint picks the path, then path[stepIndex]
+  const currentKey = questionPath.length === 0 ? 'q1' : questionPath[stepIndex];
+  const currentQ = currentKey ? QUESTION_MAP[currentKey] : undefined;
+  const currentOptions = currentQ ? resolveOptions(currentQ, answers) : [];
+
+  // Seed q1 as the opening bot message (QA mode only, runs on mount and after reset)
   useEffect(() => {
     if (chatMode === 'qa' && messages.length === 0 && !qaComplete && !triageResult) {
       addMessage({
         id: makeId(),
         role: 'assistant',
-        content: QUESTIONS[0].text[chatLang],
+        content: QUESTION_MAP.q1.text[chatLang],
         timestamp: new Date(),
       });
     }
   }, [chatMode, messages.length, qaComplete, triageResult]);
+
+  // Re-render the current question bubble when the language toggles mid-question
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (chatMode === 'qa' && !qaComplete && !triageResult && currentQ && last?.role === 'assistant') {
+      updateLastAssistantMessage(currentQ.text[chatLang]);
+    }
+  }, [chatLang]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -239,38 +74,44 @@ export default function ChatScreen() {
     }
   }, [messages.length]);
 
-  const handleOptionSelect = useCallback(async (opt: QOption) => {
-    if (handlingRef.current || isStreaming || qaComplete) return;
-    handlingRef.current = true;
+  // Shared continuation once an answer (pill, multi-select, or free text) lands.
+  const proceed = useCallback(
+    async (key: string, englishValue: string, displayValue: string, path: string[]) => {
+      addMessage({ id: makeId(), role: 'user', content: displayValue, timestamp: new Date() });
+      setAnswer(key, englishValue);
 
-    try {
-      const qIdx = currentQuestionIndex;
-      const q = QUESTIONS[qIdx];
-      const displayLabel = isBn ? opt.bn : opt.en;
+      const merged = { ...answers, [key]: englishValue };
 
-      // User bubble shows the language-appropriate label; answers always store English
-      addMessage({ id: makeId(), role: 'user', content: displayLabel, timestamp: new Date() });
-      setAnswer(q.key, opt.en);
-
-      // Q2 is conditional on the English Q1 value (stored in answers)
-      const skipQ2 = qIdx === 0 && !Q2_TRIGGERS.has(opt.en);
-      const nextIdx = qIdx + 1 + (skipQ2 ? 1 : 0);
-
-      await new Promise<void>((r) => setTimeout(r, 600));
-
-      if (nextIdx >= QUESTIONS.length) {
-        const finalAnswers = { ...answers, [q.key]: opt.en };
-        const analyzingText = isBn
-          ? 'আপনার উপসর্গ বিশ্লেষণ করা হচ্ছে...'
-          : 'Analyzing your symptoms…';
-        addMessage({ id: makeId(), role: 'assistant', content: analyzingText, timestamp: new Date() });
-        nextQuestion();
+      // Red-flag short-circuit: deterministic emergency result, no LLM call.
+      const flag = checkRedFlags(merged);
+      if (flag) {
+        await new Promise<void>((r) => setTimeout(r, 400));
+        addMessage({
+          id: makeId(),
+          role: 'assistant',
+          content: flag.reason[chatLang],
+          timestamp: new Date(),
+        });
         completeQA();
-        sendMessage(buildSummary(finalAnswers));
+        setTriageResult(buildEmergencyResult(chatLang), 'General Medicine');
+        return;
+      }
+
+      await new Promise<void>((r) => setTimeout(r, 500));
+
+      const nextIdx = stepIndex + 1;
+      if (nextIdx >= path.length) {
+        addMessage({
+          id: makeId(),
+          role: 'assistant',
+          content: isBn ? 'আপনার উপসর্গ বিশ্লেষণ করা হচ্ছে...' : 'Analyzing your symptoms…',
+          timestamp: new Date(),
+        });
+        completeQA();
+        sendMessage(buildSummary(merged, path, chatLang));
       } else {
-        nextQuestion();
-        if (skipQ2) nextQuestion();
-        const nextQ = QUESTIONS[nextIdx];
+        advance();
+        const nextQ = QUESTION_MAP[path[nextIdx]];
         addMessage({
           id: makeId(),
           role: 'assistant',
@@ -278,18 +119,84 @@ export default function ChatScreen() {
           timestamp: new Date(),
         });
       }
+    },
+    [answers, stepIndex, chatLang, isBn, sendMessage],
+  );
+
+  const handleOptionSelect = useCallback(
+    async (opt: QOption) => {
+      if (handlingRef.current || isStreaming || qaComplete || !currentQ) return;
+      handlingRef.current = true;
+      try {
+        let path = questionPath;
+        if (currentQ.key === 'q1') {
+          path = FLOWS[opt.en] ?? FLOWS.Other;
+          setPath(path);
+        }
+        await proceed(currentQ.key, opt.en, isBn ? opt.bn : opt.en, path);
+      } finally {
+        handlingRef.current = false;
+      }
+    },
+    [currentQ, questionPath, isStreaming, qaComplete, isBn, proceed],
+  );
+
+  const handleMultiToggle = useCallback(
+    (opt: QOption) => {
+      if (isStreaming || qaComplete) return;
+      if (multiDraft.includes(opt.en)) {
+        setMultiDraft(multiDraft.filter((v) => v !== opt.en));
+      } else if (opt.exclusive) {
+        setMultiDraft([opt.en]);
+      } else {
+        // picking a normal option clears any exclusive ("None") selection
+        const exclusives = new Set(currentOptions.filter((o) => o.exclusive).map((o) => o.en));
+        setMultiDraft([...multiDraft.filter((v) => !exclusives.has(v)), opt.en]);
+      }
+    },
+    [multiDraft, currentOptions, isStreaming, qaComplete],
+  );
+
+  const handleMultiDone = useCallback(async () => {
+    if (handlingRef.current || isStreaming || qaComplete || !currentQ || multiDraft.length === 0) return;
+    handlingRef.current = true;
+    try {
+      const chosen = currentOptions.filter((o) => multiDraft.includes(o.en));
+      const english = chosen.map((o) => o.en).join(', ');
+      const display = chosen.map((o) => (isBn ? o.bn : o.en)).join(', ');
+      await proceed(currentQ.key, english, display, questionPath);
     } finally {
       handlingRef.current = false;
     }
-  }, [currentQuestionIndex, answers, isStreaming, qaComplete, chatLang, isBn]);
+  }, [currentQ, currentOptions, multiDraft, questionPath, isStreaming, qaComplete, isBn, proceed]);
+
+  const handleFreeText = useCallback(
+    async (text: string) => {
+      if (handlingRef.current || isStreaming || qaComplete || !currentQ) return;
+      handlingRef.current = true;
+      try {
+        await proceed(currentQ.key, text, text, questionPath);
+      } finally {
+        handlingRef.current = false;
+      }
+    },
+    [currentQ, questionPath, isStreaming, qaComplete, proceed],
+  );
+
+  const handleBack = useCallback(() => {
+    if (isStreaming || qaComplete || stepIndex === 0) return;
+    goBack();
+  }, [isStreaming, qaComplete, stepIndex]);
 
   // ── Derived display values ──────────────────────────────────────────────────
-  const currentQ = QUESTIONS[currentQuestionIndex];
-  const currentOptions = currentQ ? resolveOptions(currentQ, answers) : [];
-  const showQAPills = chatMode === 'qa' && !qaComplete && !triageResult && !isStreaming && currentOptions.length > 0;
+  const inQAFlow = chatMode === 'qa' && !qaComplete && !triageResult && !isStreaming && !!currentQ;
+  const showQAPills = inQAFlow && !currentQ?.freeText && currentOptions.length > 0;
+  const showQAFreeText = inQAFlow && !!currentQ?.freeText;
   const showFreeInput = chatMode === 'free' && !triageResult;
-  const showProgress = chatMode === 'qa' && messages.length > 0 && !triageResult;
-  const stepNum = Math.min(currentQuestionIndex + 1, 12);
+  const showProgress = chatMode === 'qa' && questionPath.length > 0 && !triageResult && !qaComplete;
+  const totalSteps = questionPath.length;
+  const stepNum = Math.min(stepIndex + 1, totalSteps || 1);
+  const isQ1 = currentKey === 'q1';
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['bottom']}>
@@ -363,16 +270,18 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      {/* ── Progress bar (QA mode only) ─────────────────────────────────────── */}
+      {/* ── Progress bar (QA mode, once a path is chosen) ───────────────────── */}
       {showProgress && (
         <View className="px-4 pt-2 pb-2.5 bg-white border-b border-slate-100">
           <Text className="text-xs text-slate-500 mb-1.5">
-            {isBn ? `ধাপ ${stepNum} / ১২` : `Step ${stepNum} of 12`}
+            {isBn
+              ? `ধাপ ${toBnDigits(stepNum)} / ${toBnDigits(totalSteps)}`
+              : `Step ${stepNum} of ${totalSteps}`}
           </Text>
           <View className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
             <View
               className="h-full bg-primary-500 rounded-full"
-              style={{ width: `${(stepNum / 12) * 100}%` }}
+              style={{ width: `${(stepNum / Math.max(totalSteps, 1)) * 100}%` }}
             />
           </View>
         </View>
@@ -403,22 +312,79 @@ export default function ChatScreen() {
         <View className="bg-white border-t border-slate-100">
           <ScrollView
             showsVerticalScrollIndicator={false}
-            style={{ maxHeight: 160 }}
+            style={{ maxHeight: 190 }}
             contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12 }}
           >
-            {currentOptions.map((opt) => (
-              <TouchableOpacity
-                key={opt.en}
-                onPress={() => handleOptionSelect(opt)}
-                activeOpacity={0.7}
-                className="border border-primary-300 rounded-full px-4 py-2 bg-white active:bg-primary-50"
-              >
-                <Text className="text-primary-600 text-sm font-medium">
-                  {isBn ? opt.bn : opt.en}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {currentOptions.map((opt) => {
+              const selected = currentQ?.multi && multiDraft.includes(opt.en);
+              return (
+                <TouchableOpacity
+                  key={opt.en}
+                  onPress={() => (currentQ?.multi ? handleMultiToggle(opt) : handleOptionSelect(opt))}
+                  activeOpacity={0.7}
+                  className={`flex-row items-center gap-1.5 border rounded-full px-4 ${isQ1 ? 'py-2.5' : 'py-2'} ${
+                    selected ? 'bg-primary-500 border-primary-500' : 'bg-white border-primary-300 active:bg-primary-50'
+                  }`}
+                >
+                  {opt.icon ? (
+                    <Ionicons name={opt.icon as any} size={15} color={selected ? '#fff' : '#2563EB'} />
+                  ) : null}
+                  <Text className={`text-sm font-medium ${selected ? 'text-white' : 'text-primary-600'}`}>
+                    {isBn ? opt.bn : opt.en}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
+
+          {/* Back + Done row */}
+          {(stepIndex > 0 || currentQ?.multi) && (
+            <View className="flex-row items-center justify-between px-3 pb-3 gap-2">
+              {stepIndex > 0 ? (
+                <TouchableOpacity
+                  onPress={handleBack}
+                  activeOpacity={0.7}
+                  className="flex-row items-center gap-1 bg-slate-100 rounded-full px-4 py-2"
+                >
+                  <Ionicons name="arrow-back" size={14} color="#475569" />
+                  <Text className="text-slate-600 text-sm font-medium">{t('chat.back')}</Text>
+                </TouchableOpacity>
+              ) : (
+                <View />
+              )}
+              {currentQ?.multi ? (
+                <TouchableOpacity
+                  onPress={handleMultiDone}
+                  disabled={multiDraft.length === 0}
+                  activeOpacity={0.8}
+                  className={`rounded-full px-6 py-2 ${multiDraft.length === 0 ? 'bg-slate-200' : 'bg-primary-500'}`}
+                >
+                  <Text className={`text-sm font-semibold ${multiDraft.length === 0 ? 'text-slate-400' : 'text-white'}`}>
+                    {t('chat.done')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* ── QA mode: free-text step ("Other" description) ───────────────────── */}
+      {showQAFreeText && (
+        <View className="bg-white border-t border-slate-100">
+          <ChatInput onSend={handleFreeText} disabled={isStreaming} placeholder={t('chat.describe_placeholder')} />
+          {stepIndex > 0 && (
+            <View className="px-3 pb-3">
+              <TouchableOpacity
+                onPress={handleBack}
+                activeOpacity={0.7}
+                className="self-start flex-row items-center gap-1 bg-slate-100 rounded-full px-4 py-2"
+              >
+                <Ionicons name="arrow-back" size={14} color="#475569" />
+                <Text className="text-slate-600 text-sm font-medium">{t('chat.back')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
 

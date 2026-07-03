@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SeverityBadge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { MatchedDoctors } from './MatchedDoctors';
 import { useChatStore } from '../../store/chatStore';
 import type { TriageResult } from '../../types/chat';
 import type { Specialty } from '../../types/doctor';
@@ -61,16 +62,18 @@ export function SeverityCard({ result, suggestedSpecialty }: SeverityCardProps) 
   const { setPendingSpecialty } = useChatStore();
   const disclaimer = result.language === 'bn' ? DISCLAIMER_BN : DISCLAIMER_EN;
 
+  // Normalise the LLM-suggested specialty to a valid Specialty once; used by
+  // both the inline doctor list and the see-all navigation.
+  let mappedSpecialty: Specialty | null = null;
+  if (suggestedSpecialty) {
+    const candidate = SPECIALTY_MAP[suggestedSpecialty as string] ?? suggestedSpecialty;
+    mappedSpecialty = VALID_SPECIALTIES.has(candidate) ? (candidate as Specialty) : null;
+  }
+
   const handleFindDoctors = () => {
-    let mapped: string | null = null;
-    if (suggestedSpecialty) {
-      const candidate = SPECIALTY_MAP[suggestedSpecialty as string] ?? suggestedSpecialty;
-      // Only use the value if it's a valid Specialty the filter can recognise
-      mapped = VALID_SPECIALTIES.has(candidate) ? candidate : null;
-    }
     // Store the specialty in Zustand so the doctors tab can read it on focus.
     // Route params are unreliable for already-mounted bottom tab screens.
-    setPendingSpecialty(mapped);
+    setPendingSpecialty(mappedSpecialty);
     router.push('/(tabs)/doctors');
   };
 
@@ -98,6 +101,14 @@ export function SeverityCard({ result, suggestedSpecialty }: SeverityCardProps) 
           </View>
         )}
 
+        {/* What to do next */}
+        {result.recommendation ? (
+          <View className="gap-1">
+            <Text className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t('chat.what_to_do_next')}</Text>
+            <Text className="text-slate-700 text-sm leading-relaxed">{result.recommendation}</Text>
+          </View>
+        ) : null}
+
         {/* First Aid */}
         {result.firstAid && (
           <View className="gap-1">
@@ -111,26 +122,30 @@ export function SeverityCard({ result, suggestedSpecialty }: SeverityCardProps) 
           <Text className="text-amber-800 text-xs leading-relaxed">{disclaimer}</Text>
         </View>
 
-        {/* CTAs */}
-        <View className="gap-2">
-          {result.severity === 'Severe' ? (
-            <TouchableOpacity
-              onPress={() => router.push('/emergency')}
-              className="bg-red-600 rounded-xl py-3 flex-row items-center justify-center gap-2"
-            >
-              <Ionicons name="alert-circle" size={18} color="#fff" />
-              <Text className="text-white font-bold text-base">{t('chat.go_to_emergency')}</Text>
-            </TouchableOpacity>
-          ) : null}
-
+        {/* Emergency CTA */}
+        {result.severity === 'Severe' ? (
           <TouchableOpacity
-            onPress={handleFindDoctors}
-            className="bg-primary-500 rounded-xl py-3 flex-row items-center justify-center gap-2"
+            onPress={() => router.push('/emergency')}
+            className="bg-red-600 rounded-xl py-3 flex-row items-center justify-center gap-2"
           >
-            <Ionicons name="search" size={16} color="#fff" />
-            <Text className="text-white font-semibold text-base">{t('chat.find_matching_doctors')}</Text>
+            <Ionicons name="alert-circle" size={18} color="#fff" />
+            <Text className="text-white font-bold text-base">{t('chat.go_to_emergency')}</Text>
           </TouchableOpacity>
-        </View>
+        ) : null}
+
+        {/* Top matched doctors — book in one tap */}
+        {mappedSpecialty ? <MatchedDoctors specialty={mappedSpecialty} /> : null}
+
+        {/* See all matching doctors */}
+        <TouchableOpacity
+          onPress={handleFindDoctors}
+          className={`rounded-xl py-3 flex-row items-center justify-center gap-2 ${mappedSpecialty ? 'bg-white border border-primary-300' : 'bg-primary-500'}`}
+        >
+          <Ionicons name="search" size={16} color={mappedSpecialty ? '#2563EB' : '#fff'} />
+          <Text className={`font-semibold text-base ${mappedSpecialty ? 'text-primary-600' : 'text-white'}`}>
+            {mappedSpecialty ? t('chat.see_all_doctors') : t('chat.find_matching_doctors')}
+          </Text>
+        </TouchableOpacity>
       </View>
     </Card>
   );

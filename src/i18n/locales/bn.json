@@ -85,6 +85,13 @@
     "find_matching_doctors": "উপযুক্ত ডাক্তার খুঁজুন",
     "go_to_emergency": "জরুরি — ৯৯৯ কল করুন",
     "new_chat": "নতুন চ্যাট",
+    "back": "পেছনে",
+    "done": "হয়েছে",
+    "describe_placeholder": "সংক্ষেপে সমস্যাটি লিখুন...",
+    "what_to_do_next": "এখন কী করবেন",
+    "top_doctors": "আপনার জন্য সেরা ডাক্তার",
+    "see_all_doctors": "সব উপযুক্ত ডাক্তার দেখুন",
+    "book": "বুক করুন",
     "mild": "হালকা",
     "moderate": "মাঝারি",
     "severe": "গুরুতর"

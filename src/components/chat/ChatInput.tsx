@@ -6,9 +6,10 @@ import { useTranslation } from 'react-i18next';
 interface ChatInputProps {
   onSend: (text: string) => void;
   disabled?: boolean;
+  placeholder?: string;
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
   const [text, setText] = useState('');
   const { t } = useTranslation();
 
@@ -24,7 +25,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
       <TextInput
         value={text}
         onChangeText={setText}
-        placeholder={t('chat.placeholder')}
+        placeholder={placeholder ?? t('chat.placeholder')}
         placeholderTextColor="#94A3B8"
         multiline
         maxLength={500}

@@ -36,7 +36,10 @@ export async function getDoctors(filter: DoctorFilter = {}): Promise<Doctor[]> {
   } else if (filter.telemedicineOnly) {
     constraints.push(where('telemedicineAvailable', '==', true));
   }
-  constraints.push(orderBy('ratingAvg', 'desc'), limit(50));
+  // Sorting by ratingAvg is done client-side (below) rather than via orderBy so
+  // the query stays equality-only and needs no composite index — deploying those
+  // requires the Firebase CLI, and the dataset is small enough to sort in JS.
+  constraints.push(limit(50));
 
   const snap = await getDocs(query(collection(db, 'doctors'), ...constraints));
   let doctors = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Doctor));
@@ -49,6 +52,7 @@ export async function getDoctors(filter: DoctorFilter = {}): Promise<Doctor[]> {
   }
   if (filter.maxFee) doctors = doctors.filter((d) => d.consultationFee <= filter.maxFee!);
 
+  doctors.sort((a, b) => (b.ratingAvg ?? 0) - (a.ratingAvg ?? 0));
   return doctors;
 }
 
@@ -159,16 +163,21 @@ export async function getAppointment(id: string): Promise<Appointment | null> {
   return { id: snap.id, ...snap.data() } as Appointment;
 }
 
+// Appointments are sorted by date client-side (see sortByDateDesc) instead of via
+// orderBy, keeping these queries equality-only so they need no composite index.
+function sortByDateDesc(appointments: Appointment[]): Appointment[] {
+  return appointments.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+}
+
 export async function getUserAppointments(userId: string): Promise<Appointment[]> {
   const snap = await getDocs(
     query(
       collection(db, 'appointments'),
       where('patientId', '==', userId),
-      orderBy('date', 'desc'),
       limit(50),
     ),
   );
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Appointment));
+  return sortByDateDesc(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Appointment)));
 }
 
 export function subscribeUserAppointments(
@@ -180,10 +189,9 @@ export function subscribeUserAppointments(
     query(
       collection(db, 'appointments'),
       where('patientId', '==', patientId),
-      orderBy('date', 'desc'),
       limit(50),
     ),
-    (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Appointment))),
+    (snap) => onData(sortByDateDesc(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Appointment)))),
     (err) => onError?.(err),
   );
 }
@@ -197,10 +205,9 @@ export function subscribeDoctorAppointments(
     query(
       collection(db, 'appointments'),
       where('doctorUserId', '==', doctorUserId),
-      orderBy('date', 'desc'),
       limit(100),
     ),
-    (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Appointment))),
+    (snap) => onData(sortByDateDesc(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Appointment)))),
     (err) => onError?.(err),
   );
 }

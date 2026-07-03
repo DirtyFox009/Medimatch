@@ -32,6 +32,7 @@
     "login": "Log In",
     "register": "Create Account",
     "logout": "Log Out",
+    "logout_confirm": "Are you sure you want to log out?",
     "email": "Email address",
     "password": "Password",
     "confirm_password": "Confirm password",

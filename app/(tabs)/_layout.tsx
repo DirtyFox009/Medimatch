@@ -7,6 +7,8 @@ import { useRouter } from 'expo-router';
 import i18n from '../../src/i18n';
 import { DesktopShell, type ShellNavItem } from '../../src/components/layout/DesktopShell';
 import { useIsDesktop } from '../../src/hooks/useIsDesktop';
+import { signOut } from '../../src/services/firebase/auth';
+import { showAlert } from '../../src/utils/alert';
 
 function LanguageToggle() {
   const { i18n: i18nHook } = useTranslation();
@@ -29,6 +31,24 @@ function EmergencyButton() {
       className="mr-2 bg-red-600 rounded-full w-8 h-8 items-center justify-center"
     >
       <Ionicons name="alert-circle" size={18} color="#fff" />
+    </TouchableOpacity>
+  );
+}
+
+function LogoutButton() {
+  const { t } = useTranslation();
+  const confirmLogout = () => {
+    showAlert(t('auth.logout'), t('auth.logout_confirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('auth.logout'), style: 'destructive', onPress: () => signOut() },
+    ]);
+  };
+  return (
+    <TouchableOpacity
+      onPress={confirmLogout}
+      className="mr-4 bg-slate-100 rounded-full w-8 h-8 items-center justify-center"
+    >
+      <Ionicons name="log-out-outline" size={18} color="#475569" />
     </TouchableOpacity>
   );
 }
@@ -60,6 +80,7 @@ export default function TabsLayout() {
           <View className="flex-row items-center">
             <EmergencyButton />
             <LanguageToggle />
+            <LogoutButton />
           </View>
         ),
         headerStyle: { backgroundColor: '#fff' },

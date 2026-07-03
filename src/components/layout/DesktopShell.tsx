@@ -5,6 +5,8 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import { useAuth } from '../../hooks/useAuth';
+import { signOut } from '../../services/firebase/auth';
+import { showAlert } from '../../utils/alert';
 
 export interface ShellNavItem {
   key: string;
@@ -59,6 +61,13 @@ export function DesktopShell({
   const colors = ACCENT[accent];
   const initial = (appUser?.displayName ?? user?.displayName ?? 'U').charAt(0).toUpperCase();
 
+  const confirmLogout = () => {
+    showAlert(t('auth.logout'), t('auth.logout_confirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('auth.logout'), style: 'destructive', onPress: () => signOut() },
+    ]);
+  };
+
   return (
     <View className="flex-1 flex-row bg-slate-50">
       {/* Sidebar */}
@@ -108,9 +117,15 @@ export function DesktopShell({
           <Text className="text-xl font-bold text-slate-800">{title}</Text>
           <View className="flex-row items-center gap-4">
             <LanguagePill />
-            <View className={`h-10 w-10 items-center justify-center rounded-full ${accent === 'teal' ? 'bg-teal-500' : 'bg-primary-500'}`}>
-              <Text className="text-base font-bold text-white">{initial}</Text>
-            </View>
+            <TouchableOpacity
+              onPress={confirmLogout}
+              className="flex-row items-center gap-1.5 rounded-full border border-slate-200 px-2 py-1"
+            >
+              <View className={`h-8 w-8 items-center justify-center rounded-full ${accent === 'teal' ? 'bg-teal-500' : 'bg-primary-500'}`}>
+                <Text className="text-sm font-bold text-white">{initial}</Text>
+              </View>
+              <Ionicons name="log-out-outline" size={16} color="#64748B" />
+            </TouchableOpacity>
           </View>
         </View>
         <View className="flex-1">{children}</View>

@@ -7,7 +7,7 @@ export const CONFIG = {
   // key never ships in a client bundle. See api/groq.ts.
   groqProxyUrl: (process.env.EXPO_PUBLIC_GROQ_PROXY_URL ??
     extra.groqProxyUrl ??
-    'https://medimatch.vercel.app/api/groq') as string,
+    'https://medimatch-weld.vercel.app/api/groq') as string,
   firebase: {
     apiKey: (process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '') as string,
     authDomain: (process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '') as string,

@@ -8,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Card } from '../../src/components/ui/Card';
 import { Badge } from '../../src/components/ui/Badge';
 import { getUserRecords, addRecord, deleteRecord } from '../../src/services/firebase/firestore';
-import { uploadMedicalFile } from '../../src/services/firebase/storage';
+import { uploadMedicalFile, FileTooLargeError, MAX_RECORD_FILE_BYTES } from '../../src/services/firebase/storage';
 import { useAuth } from '../../src/hooks/useAuth';
 import { showAlert } from '../../src/utils/alert';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
@@ -45,30 +45,30 @@ export default function RecordsScreen() {
 
   const handleUpload = async (type: RecordType) => {
     if (!user) return;
+
+    let result: { uri: string; name: string; mimeType: string; size: number } | null = null;
+    if (type === 'scan') {
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+      if (!picked.canceled && picked.assets[0]) {
+        const asset = picked.assets[0];
+        result = { uri: asset.uri, name: `scan_${Date.now()}.jpg`, mimeType: 'image/jpeg', size: asset.fileSize ?? 0 };
+      }
+    } else {
+      const picked = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'] });
+      if (!picked.canceled && picked.assets[0]) {
+        const asset = picked.assets[0];
+        result = { uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? 'application/octet-stream', size: asset.size ?? 0 };
+      }
+    }
+
+    if (!result) return;
+
     setUploading(true);
     try {
-      let result: { uri: string; name: string; mimeType: string; size: number } | null = null;
-
-      if (type === 'scan') {
-        const picked = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false,
-          quality: 0.8,
-        });
-        if (!picked.canceled && picked.assets[0]) {
-          const asset = picked.assets[0];
-          result = { uri: asset.uri, name: `scan_${Date.now()}.jpg`, mimeType: 'image/jpeg', size: asset.fileSize ?? 0 };
-        }
-      } else {
-        const picked = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'] });
-        if (!picked.canceled && picked.assets[0]) {
-          const asset = picked.assets[0];
-          result = { uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? 'application/octet-stream', size: asset.size ?? 0 };
-        }
-      }
-
-      if (!result) return;
-
       const { url } = await uploadMedicalFile(user.uid, result.uri, result.name, result.mimeType);
       const id = await addRecord(user.uid, {
         userId: user.uid,
@@ -100,7 +100,12 @@ export default function RecordsScreen() {
       };
       setRecords((prev) => [newRecord, ...prev]);
     } catch (e) {
-      showAlert('Upload failed', 'Could not upload file. Please try again.');
+      if (e instanceof FileTooLargeError) {
+        const maxKb = Math.round(MAX_RECORD_FILE_BYTES / 1024);
+        showAlert('File too large', `Files must be under ${maxKb} KB. Try a smaller file or a compressed photo.`);
+      } else {
+        showAlert('Upload failed', 'Could not upload file. Please try again.');
+      }
     } finally {
       setUploading(false);
     }

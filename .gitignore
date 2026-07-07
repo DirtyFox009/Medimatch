@@ -35,7 +35,7 @@ yarn-error.*
 .env*.local
 .env.production
 service-account.json
-*service-account*.json
+*service-account*
 dist-seed/
 
 # project data exports (backupProject.ts)

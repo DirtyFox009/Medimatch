@@ -55,7 +55,8 @@
     "seed": "ts-node --project tsconfig.seed.json scripts/seedDoctors.ts",
     "provision-doctors": "ts-node --project tsconfig.seed.json scripts/provisionDoctorAccounts.ts",
     "backup": "ts-node --project tsconfig.seed.json scripts/backupProject.ts",
-    "restore": "ts-node --project tsconfig.seed.json scripts/restoreProject.ts"
+    "restore": "ts-node --project tsconfig.seed.json scripts/restoreProject.ts",
+    "deploy:rules": "ts-node --project tsconfig.seed.json scripts/deployRules.ts"
   },
   "private": true
 }

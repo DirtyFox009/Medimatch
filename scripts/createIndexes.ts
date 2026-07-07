@@ -2,8 +2,12 @@ import * as path from 'path';
 import * as https from 'https';
 import { GoogleAuth } from 'google-auth-library';
 
-const PROJECT_ID = 'medimatch-bd';
-const SA_PATH = path.resolve(__dirname, '../service-account.json');
+const SA_PATH = path.resolve(
+  __dirname,
+  '..',
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? './service-account.json',
+);
+const PROJECT_ID = JSON.parse(require('fs').readFileSync(SA_PATH, 'utf8')).project_id;
 
 const indexes = [
   {

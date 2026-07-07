@@ -72,10 +72,12 @@ scripts/                Firestore seed + doctor account provisioning
 
 ## Environment Variables
 
-All client keys are `EXPO_PUBLIC_`-prefixed and centralized in `src/constants/config.ts`. The Firebase web config is public by design — security is enforced by the deployed Firestore rules, not by hiding these values.
+All client keys are `EXPO_PUBLIC_`-prefixed and centralized in `src/constants/config.ts`. No `.env` file is committed to this repo: local development reads `.env.local` (copy from `.env.local.example`), and production values are set in Vercel's dashboard (Project → Settings → Environment Variables), which take precedence over any `.env` file at build time.
+
+The Firebase web API key ships in the client bundle as Firebase requires, but it is restricted in Google Cloud Console to this app's domains and to the specific Firebase APIs it needs — security is enforced by API-key restrictions plus the deployed Firestore/Storage rules, never by hiding config.
 
 The Groq API key is **never** shipped to the client: it lives only in Vercel's dashboard as `GROQ_API_KEY` and is used server-side by the proxy in `api/groq.ts`.
 
 ## Deployment
 
-The web build deploys to Vercel as a static Expo export, with the `api/` directory providing serverless functions. Pushes to `main` deploy automatically.
+The web build deploys to Vercel as a static Expo export, with the `api/` directory providing serverless functions. Pushes to `main` deploy automatically. Required Vercel environment variables: the six `EXPO_PUBLIC_FIREBASE_*` values, `EXPO_PUBLIC_GROQ_PROXY_URL`, and `GROQ_API_KEY` (server-side only).

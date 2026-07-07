@@ -30,10 +30,16 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files — no .env file is ever committed; production values live in
+# the Vercel dashboard (Settings → Environment Variables)
 .env*.local
+.env.production
 service-account.json
+*service-account*.json
 dist-seed/
+
+# project data exports (backupProject.ts)
+backup/
 
 # typescript
 *.tsbuildinfo

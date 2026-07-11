@@ -19,7 +19,9 @@
     "book_now": "এখনই বুক করুন",
     "view_all": "সব দেখুন",
     "no_results": "কোনো ফলাফল পাওয়া যায়নি",
-    "taka": "৳"
+    "taka": "৳",
+    "edit": "সম্পাদনা",
+    "any": "যেকোনো"
   },
   "nav": {
     "home": "হোম",
@@ -53,7 +55,8 @@
     "back_to_login": "লগইনে ফিরে যান",
     "verify_email_banner": "অনুগ্রহ করে আপনার ইমেইল যাচাই করুন — ইনবক্সে পাঠানো লিঙ্কটি দেখুন।",
     "resend": "আবার পাঠান",
-    "verification_sent": "পাঠানো হয়েছে ✓"
+    "verification_sent": "পাঠানো হয়েছে ✓",
+    "emergency_link": "জরুরি — কাছের হাসপাতাল খুঁজুন"
   },
   "home": {
     "greeting": "হ্যালো, {{name}}",
@@ -189,7 +192,12 @@
     "notes": "নোট",
     "no_records": "এখনো কোনো মেডিকেল রেকর্ড নেই",
     "file_size": "{{size}} কেবি",
-    "delete_confirm": "এই রেকর্ড স্থায়ীভাবে মুছবেন?"
+    "delete_confirm": "এই রেকর্ড স্থায়ীভাবে মুছবেন?",
+    "record_title": "শিরোনাম",
+    "take_photo": "ছবি তুলুন",
+    "from_gallery": "গ্যালারি থেকে",
+    "choose_file": "ফাইল নির্বাচন করুন",
+    "no_file": "আগে একটি ফাইল নির্বাচন করুন"
   },
   "medicines": {
     "title": "ওষুধের রিমাইন্ডার",
@@ -201,6 +209,10 @@
     "twice_daily": "দিনে দুইবার",
     "thrice_daily": "দিনে তিনবার",
     "weekly": "সাপ্তাহিক",
+    "custom": "নিজের সময়",
+    "times_hint": "যেমন 08:00, 14:30, 21:00",
+    "invalid_times": "সময় HH:MM ফরম্যাটে কমা দিয়ে আলাদা করে লিখুন",
+    "invalid_dates": "তারিখ YYYY-MM-DD ফরম্যাটে দিন এবং শেষ তারিখ শুরুর তারিখের পরে হতে হবে",
     "reminder_times": "রিমাইন্ডারের সময়",
     "start_date": "শুরুর তারিখ",
     "end_date": "শেষের তারিখ (ঐচ্ছিক)",
@@ -224,7 +236,10 @@
     "severity": "তীব্রতা",
     "availability": "বুকিং গ্রহণ করছেন",
     "available_for_booking": "এটি চালু থাকলে রোগীরা আপনাকে খুঁজে বুক করতে পারবেন",
-    "no_appointments_today": "আজ কোনো অ্যাপয়েন্টমেন্ট নেই"
+    "no_appointments_today": "আজ কোনো অ্যাপয়েন্টমেন্ট নেই",
+    "edit_profile": "প্রোফাইল সম্পাদনা",
+    "profile_updated": "প্রোফাইল আপডেট হয়েছে",
+    "qualifications_hint": "কমা দিয়ে আলাদা করুন, যেমন MBBS, FCPS"
   },
   "reviews": {
     "rate_doctor": "ডাক্তারকে রেট করুন",

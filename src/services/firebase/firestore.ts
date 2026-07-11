@@ -17,6 +17,7 @@ import {
   type QueryConstraint,
   type Unsubscribe,
 } from 'firebase/firestore';
+import { format } from 'date-fns';
 import { db } from './config';
 import type { Doctor, DoctorFilter, Review } from '../../types/doctor';
 import type { Appointment, AppointmentStatus } from '../../types/appointment';
@@ -51,6 +52,11 @@ export async function getDoctors(filter: DoctorFilter = {}): Promise<Doctor[]> {
     doctors = doctors.filter((d) => d.telemedicineAvailable);
   }
   if (filter.maxFee) doctors = doctors.filter((d) => d.consultationFee <= filter.maxFee!);
+  if (filter.availableToday) {
+    // availableDays holds short day names ('Sat', 'Sun', …) — see seedDoctors.ts.
+    const today = format(new Date(), 'EEE');
+    doctors = doctors.filter((d) => d.availableDays?.includes(today));
+  }
 
   doctors.sort((a, b) => (b.ratingAvg ?? 0) - (a.ratingAvg ?? 0));
   return doctors;
@@ -68,6 +74,36 @@ export async function updateDoctorAvailability(
 ): Promise<void> {
   await updateDoc(doc(db, 'doctors', doctorId), {
     isAvailable,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Fields a doctor may edit on their own profile. Identity and trust fields
+ * (name, specialty, BMDC number, verified badge, ratings) stay operator-only —
+ * mirrored by the doctors update rule in firestore.rules.
+ */
+export type EditableDoctorProfile = Partial<
+  Pick<
+    Doctor,
+    | 'qualifications'
+    | 'hospitalNameEn'
+    | 'hospitalNameBn'
+    | 'consultationFee'
+    | 'telemedicineFee'
+    | 'telemedicineAvailable'
+    | 'availableDays'
+    | 'timeSlots'
+    | 'bio'
+  >
+>;
+
+export async function updateDoctorProfile(
+  doctorId: string,
+  data: EditableDoctorProfile,
+): Promise<void> {
+  await updateDoc(doc(db, 'doctors', doctorId), {
+    ...data,
     updatedAt: serverTimestamp(),
   });
 }

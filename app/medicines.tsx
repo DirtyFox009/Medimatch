@@ -22,7 +22,21 @@ const FREQUENCY_OPTIONS: { value: ReminderFrequency; times: string[] }[] = [
   { value: 'twice_daily', times: ['08:00', '20:00'] },
   { value: 'thrice_daily', times: ['08:00', '14:00', '20:00'] },
   { value: 'weekly', times: ['09:00'] },
+  { value: 'custom', times: [] },
 ];
+
+const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseCustomTimes(input: string): string[] | null {
+  const times = input
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (times.length === 0 || times.some((v) => !TIME_RE.test(v))) return null;
+  // Normalise "8:00" → "08:00" so display and scheduling stay consistent.
+  return times.map((v) => (v.length === 4 ? `0${v}` : v));
+}
 
 async function scheduleMedicineNotifications(
   medicineName: string,
@@ -64,53 +78,82 @@ export default function MedicinesScreen() {
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [frequency, setFrequency] = useState<ReminderFrequency>('daily');
+  const [customTimes, setCustomTimes] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    getUserMedicines(user.uid).then(setMedicines);
+    getUserMedicines(user.uid).then(async (meds) => {
+      // Reminders past their end date are deactivated on load — DAILY triggers
+      // have no native end date, so this is where expiry is enforced.
+      const today = new Date().toISOString().split('T')[0];
+      const expired = meds.filter((m) => m.isActive && m.endDate && m.endDate < today);
+      for (const m of expired) {
+        await cancelMedicineNotifications(m.notificationIds);
+        await updateMedicine(user.uid, m.id, { isActive: false, notificationIds: [] });
+      }
+      setMedicines(
+        meds.map((m) =>
+          expired.some((e) => e.id === m.id) ? { ...m, isActive: false, notificationIds: [] } : m,
+        ),
+      );
+    });
   }, [user]);
+
+  const openModal = () => {
+    setName('');
+    setDosage('');
+    setFrequency('daily');
+    setCustomTimes('');
+    setStartDate(new Date().toISOString().split('T')[0]);
+    setEndDate('');
+    setShowModal(true);
+  };
 
   const handleSave = async () => {
     if (!user || !name.trim()) return;
+
+    let times: string[];
+    if (frequency === 'custom') {
+      const parsed = parseCustomTimes(customTimes);
+      if (!parsed) {
+        showAlert(t('medicines.invalid_times'), t('medicines.times_hint'));
+        return;
+      }
+      times = parsed;
+    } else {
+      times = FREQUENCY_OPTIONS.find((f) => f.value === frequency)?.times ?? ['08:00'];
+    }
+
+    const start = startDate.trim() || new Date().toISOString().split('T')[0];
+    const end = endDate.trim() || null;
+    if (!DATE_RE.test(start) || (end && (!DATE_RE.test(end) || end < start))) {
+      showAlert(t('medicines.invalid_dates'));
+      return;
+    }
+
     setSaving(true);
     try {
       const status = Notifications ? (await Notifications.requestPermissionsAsync()).status : 'undetermined';
-      const times = FREQUENCY_OPTIONS.find((f) => f.value === frequency)?.times ?? ['08:00'];
       const notificationIds = status === 'granted' ? await scheduleMedicineNotifications(name, times) : [];
 
-      const id = await saveMedicine(user.uid, {
+      const data = {
         userId: user.uid,
         medicineName: name,
         dosage,
         frequency,
         times,
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: null,
+        startDate: start,
+        endDate: end,
         notes: '',
         isActive: true,
         notificationIds,
-      });
-
-      const newMed: MedicineReminder = {
-        id,
-        userId: user.uid,
-        medicineName: name,
-        dosage,
-        frequency,
-        times,
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: null,
-        notes: '',
-        isActive: true,
-        notificationIds,
-        createdAt: new Date(),
       };
-      setMedicines((prev) => [newMed, ...prev]);
+      const id = await saveMedicine(user.uid, data);
+      setMedicines((prev) => [{ id, ...data, createdAt: new Date() }, ...prev]);
       setShowModal(false);
-      setName('');
-      setDosage('');
-      setFrequency('daily');
     } finally {
       setSaving(false);
     }
@@ -152,7 +195,7 @@ export default function MedicinesScreen() {
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ padding: 16, gap: 10 }}
         ListHeaderComponent={
-          <Button title={t('medicines.add_reminder')} onPress={() => setShowModal(true)} fullWidth className="mb-4" />
+          <Button title={t('medicines.add_reminder')} onPress={openModal} fullWidth className="mb-4" />
         }
         ListEmptyComponent={
           <View className="items-center py-16 gap-3">
@@ -167,6 +210,9 @@ export default function MedicinesScreen() {
                 <Text className="font-bold text-slate-800">{item.medicineName}</Text>
                 {item.dosage ? <Text className="text-slate-500 text-sm">{item.dosage}</Text> : null}
                 <Text className="text-slate-400 text-xs capitalize">{item.frequency.replace('_', ' ')} — {item.times.join(', ')}</Text>
+                <Text className="text-slate-400 text-xs">
+                  {item.startDate}{item.endDate ? ` → ${item.endDate}` : ''}
+                </Text>
               </View>
               <View className="flex-row items-center gap-2">
                 <Switch
@@ -211,6 +257,31 @@ export default function MedicinesScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            {frequency === 'custom' && (
+              <Input
+                label={t('medicines.reminder_times')}
+                placeholder={t('medicines.times_hint')}
+                value={customTimes}
+                onChangeText={setCustomTimes}
+                autoCapitalize="none"
+              />
+            )}
+
+            <Input
+              label={t('medicines.start_date')}
+              placeholder="YYYY-MM-DD"
+              value={startDate}
+              onChangeText={setStartDate}
+              autoCapitalize="none"
+            />
+            <Input
+              label={t('medicines.end_date')}
+              placeholder="YYYY-MM-DD"
+              value={endDate}
+              onChangeText={setEndDate}
+              autoCapitalize="none"
+            />
 
             <Button title={t('common.save')} onPress={handleSave} loading={saving} fullWidth size="lg" />
           </ScrollView>

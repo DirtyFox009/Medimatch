@@ -12,6 +12,18 @@ import { StarRating } from '../../src/components/doctors/StarRating';
 import { Skeleton } from '../../src/components/ui/Skeleton';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import { useDoctor } from '../../src/hooks/useDoctors';
+import { format } from 'date-fns';
+
+/** Reviews arrive with a Firestore Timestamp in createdAt despite the Date typing. */
+function reviewDate(createdAt: unknown): string {
+  const d =
+    createdAt && typeof (createdAt as any).toDate === 'function'
+      ? (createdAt as any).toDate()
+      : createdAt instanceof Date
+        ? createdAt
+        : null;
+  return d ? format(d, 'd MMM yyyy') : '';
+}
 
 export default function DoctorProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -131,6 +143,7 @@ export default function DoctorProfileScreen() {
                   <View className="flex-row items-center gap-2">
                     <Text className="font-medium text-slate-700 text-sm">{r.patientName}</Text>
                     <StarRating rating={r.rating} size={12} />
+                    <Text className="text-slate-400 text-xs ml-auto">{reviewDate(r.createdAt)}</Text>
                   </View>
                   <Text className="text-slate-500 text-sm">{r.comment}</Text>
                 </View>

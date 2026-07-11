@@ -19,7 +19,9 @@
     "book_now": "Book Now",
     "view_all": "View All",
     "no_results": "No results found",
-    "taka": "৳"
+    "taka": "৳",
+    "edit": "Edit",
+    "any": "Any"
   },
   "nav": {
     "home": "Home",
@@ -53,7 +55,8 @@
     "back_to_login": "Back to log in",
     "verify_email_banner": "Please verify your email address — check your inbox for the link.",
     "resend": "Resend",
-    "verification_sent": "Sent ✓"
+    "verification_sent": "Sent ✓",
+    "emergency_link": "Emergency — find nearby hospitals"
   },
   "home": {
     "greeting": "Hello, {{name}}",
@@ -189,7 +192,12 @@
     "notes": "Notes",
     "no_records": "No medical records yet",
     "file_size": "{{size}} KB",
-    "delete_confirm": "Delete this record permanently?"
+    "delete_confirm": "Delete this record permanently?",
+    "record_title": "Title",
+    "take_photo": "Take Photo",
+    "from_gallery": "From Gallery",
+    "choose_file": "Choose File",
+    "no_file": "Pick a file first"
   },
   "medicines": {
     "title": "Medicine Reminders",
@@ -201,6 +209,10 @@
     "twice_daily": "Twice Daily",
     "thrice_daily": "Three Times Daily",
     "weekly": "Weekly",
+    "custom": "Custom Times",
+    "times_hint": "e.g. 08:00, 14:30, 21:00",
+    "invalid_times": "Enter times as HH:MM, separated by commas",
+    "invalid_dates": "Dates must be YYYY-MM-DD and the end date must be after the start date",
     "reminder_times": "Reminder Times",
     "start_date": "Start Date",
     "end_date": "End Date (optional)",
@@ -224,7 +236,10 @@
     "severity": "Severity",
     "availability": "Accepting bookings",
     "available_for_booking": "Patients can find and book you while this is on",
-    "no_appointments_today": "No appointments today"
+    "no_appointments_today": "No appointments today",
+    "edit_profile": "Edit Profile",
+    "profile_updated": "Profile updated",
+    "qualifications_hint": "Separate with commas, e.g. MBBS, FCPS"
   },
   "reviews": {
     "rate_doctor": "Rate Doctor",

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { useRouter, Link } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { Input } from '../../src/components/ui/Input';
@@ -106,6 +107,15 @@ export default function LoginScreen() {
               <Text className="text-primary-600 font-semibold">{t('auth.register')}</Text>
             </Link>
           </View>
+
+          {/* Emergency locator works without an account (FR10) */}
+          <TouchableOpacity
+            onPress={() => router.push('/emergency')}
+            className="flex-row items-center justify-center gap-2 border border-red-200 bg-red-50 rounded-xl px-4 py-3 mb-8"
+          >
+            <Ionicons name="alert-circle" size={18} color="#DC2626" />
+            <Text className="text-red-600 font-semibold">{t('auth.emergency_link')}</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

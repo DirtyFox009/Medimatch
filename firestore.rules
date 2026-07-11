@@ -30,11 +30,20 @@ service cloud.firestore {
     // ── Doctors (seeded via admin SDK) ───────────────────────────────────
     match /doctors/{doctorId} {
       allow read: if authed();
-      // A doctor may toggle only their own availability.
+      // A doctor may edit their own profile's practice details. Identity and
+      // trust fields (name, specialty, bmdcReg, isVerified, ratings) remain
+      // operator-only via the seed/provision scripts.
       allow update: if authed()
         && resource.data.get('userId', '') == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['isAvailable', 'updatedAt']);
+             .hasOnly(['isAvailable', 'qualifications', 'hospitalNameEn',
+                       'hospitalNameBn', 'consultationFee', 'telemedicineFee',
+                       'telemedicineAvailable', 'availableDays', 'timeSlots',
+                       'bio', 'updatedAt'])
+        && request.resource.data.consultationFee is number
+        && request.resource.data.consultationFee >= 0
+        && request.resource.data.telemedicineFee is number
+        && request.resource.data.telemedicineFee >= 0;
       // Rating aggregation: any authed user may advance the rating fields by
       // exactly one review. Runs in the same transaction as the review create
       // below, whose rule enforces the completed-appointment requirement.

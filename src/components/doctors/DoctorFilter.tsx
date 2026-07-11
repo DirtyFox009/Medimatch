@@ -63,12 +63,40 @@ export function DoctorFilter({ filter, onChange }: DoctorFilterProps) {
         </ScrollView>
       </View>
 
+      {/* Max fee chips */}
+      <View className="flex-row items-center px-4 pt-2 gap-2">
+        <Text className="text-xs text-slate-500">{t('doctors.max_fee')}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1">
+          {FEE_OPTIONS.map((fee) => (
+            <TouchableOpacity
+              key={fee}
+              onPress={() => onChange({ ...filter, maxFee: fee || undefined })}
+              className={`mr-2 px-3 py-1.5 rounded-full border ${(filter.maxFee ?? 0) === fee ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200 bg-white'}`}
+            >
+              <Text className={`text-xs font-medium ${(filter.maxFee ?? 0) === fee ? 'text-white' : 'text-slate-600'}`}>
+                {fee === 0 ? t('common.any') : `≤ ৳${fee}`}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* Telemedicine toggle */}
       <View className="flex-row items-center justify-between px-4 pt-2">
         <Text className="text-sm text-slate-600">{t('doctors.telemedicine_only')}</Text>
         <Switch
           value={!!filter.telemedicineOnly}
           onValueChange={(v) => onChange({ ...filter, telemedicineOnly: v })}
+          trackColor={{ true: '#0D9488' }}
+        />
+      </View>
+
+      {/* Same-day availability toggle */}
+      <View className="flex-row items-center justify-between px-4 pt-2">
+        <Text className="text-sm text-slate-600">{t('doctors.available_today')}</Text>
+        <Switch
+          value={!!filter.availableToday}
+          onValueChange={(v) => onChange({ ...filter, availableToday: v })}
           trackColor={{ true: '#0D9488' }}
         />
       </View>

@@ -56,7 +56,8 @@
     "provision-doctors": "ts-node --project tsconfig.seed.json scripts/provisionDoctorAccounts.ts",
     "backup": "ts-node --project tsconfig.seed.json scripts/backupProject.ts",
     "restore": "ts-node --project tsconfig.seed.json scripts/restoreProject.ts",
-    "deploy:rules": "ts-node --project tsconfig.seed.json scripts/deployRules.ts"
+    "deploy:rules": "ts-node --project tsconfig.seed.json scripts/deployRules.ts",
+    "test:e2e": "playwright test"
   },
   "private": true
 }

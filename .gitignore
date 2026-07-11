@@ -41,6 +41,10 @@ dist-seed/
 # project data exports (backupProject.ts)
 backup/
 
+# playwright
+test-results/
+playwright-report/
+
 # typescript
 *.tsbuildinfo
 

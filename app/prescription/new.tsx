@@ -7,11 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../../src/components/ui/Card';
 import { Button } from '../../src/components/ui/Button';
 import { Input } from '../../src/components/ui/Input';
+import { DateField } from '../../src/components/ui/DateField';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import { RiskFactorToggles } from '../../src/components/prescriptions/RiskFactorToggles';
-import { MedicineSearchInput } from '../../src/components/prescriptions/MedicineSearchInput';
 import { SuggestionPanel } from '../../src/components/prescriptions/SuggestionPanel';
-import { PrescriptionItemRow } from '../../src/components/prescriptions/PrescriptionItemRow';
+import {
+  MedicineTableRow,
+  type EditableItem,
+} from '../../src/components/prescriptions/MedicineTableRow';
 import { useAuth } from '../../src/hooks/useAuth';
 import { showAlert } from '../../src/utils/alert';
 import {
@@ -45,6 +48,26 @@ const EMPTY_SUGGESTIONS: SuggestionResult = {
 
 const GENDERS: PatientGender[] = ['male', 'female', 'other'];
 
+// Common "Sig" (timing) options for the instructions dropdown.
+const TIMING_OPTIONS = ['After meal', 'Before meal', 'Empty stomach', 'With food', 'Bedtime', 'As needed'];
+// Bangladeshi dose-convention quick chips.
+const QUICK_DOSES = ['1+0+1', '1+1+1', '0+0+1', '1+0+0', '0+1+0', '1+1+0', 'SOS', 'As needed'];
+
+let rowSeq = 0;
+function emptyRow(): EditableItem {
+  rowSeq += 1;
+  return {
+    _key: `row-${rowSeq}`,
+    medicineName: '',
+    genericName: '',
+    strength: '',
+    dosage: '',
+    durationDays: 0,
+    timing: '',
+    instructions: '',
+  };
+}
+
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -69,7 +92,8 @@ export default function NewPrescriptionScreen() {
   const [riskFlags, setRiskFlags] = useState<PatientRiskFlags>(EMPTY_RISK_FLAGS);
   const [complaint, setComplaint] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
-  const [items, setItems] = useState<PrescriptionItem[]>([]);
+  const [rows, setRows] = useState<EditableItem[]>(() => [emptyRow(), emptyRow()]);
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [tests, setTests] = useState('');
   const [advice, setAdvice] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
@@ -119,30 +143,55 @@ export default function NewPrescriptionScreen() {
     return () => clearTimeout(handle);
   }, [diagnosis, complaint, riskFlags]);
 
-  const itemWarnings = useMemo(
+  // Per-row safety metadata for the Status column.
+  const rowMeta = useMemo(
     () =>
-      items.map((item) => {
-        const med = getMedicine(item.medicineName);
-        return med ? validateMedicine(med, diagnosis, complaint, riskFlags) : [];
+      rows.map((row) => {
+        const med = getMedicine(row.medicineName);
+        return {
+          known: !!med,
+          warnings: med ? validateMedicine(med, diagnosis, complaint, riskFlags) : [],
+        };
       }),
-    [items, diagnosis, complaint, riskFlags],
+    [rows, diagnosis, complaint, riskFlags],
   );
 
+  const patchRow = (key: string, patch: Partial<PrescriptionItem>) =>
+    setRows((prev) => prev.map((r) => (r._key === key ? { ...r, ...patch } : r)));
+
+  const removeRow = (key: string) =>
+    setRows((prev) => (prev.length > 1 ? prev.filter((r) => r._key !== key) : prev));
+
+  const addRow = () => setRows((prev) => [...prev, emptyRow()]);
+
+  const applyQuickDose = (dose: string) =>
+    setRows((prev) => {
+      if (!prev.length) return prev;
+      let key = focusedKey && prev.some((r) => r._key === focusedKey) ? focusedKey : null;
+      if (!key) {
+        const empty = prev.find((r) => !r.dosage.trim());
+        key = empty ? empty._key : prev[0]._key;
+      }
+      return prev.map((r) => (r._key === key ? { ...r, dosage: dose } : r));
+    });
+
+  // Add a suggested medicine — fill the first empty row, else append one.
   const addMedicine = (medicine: Medicine) => {
-    if (items.some((i) => i.medicineName === medicine.name)) return;
+    if (rows.some((r) => r.medicineName === medicine.name)) return;
+    const fill = (r: EditableItem): EditableItem => ({
+      ...r,
+      medicineName: medicine.name,
+      genericName: medicine.generic,
+      strength: medicine.strength,
+      timing: r.timing || medicine.timing,
+      instructions: r.instructions || medicine.caution,
+    });
     const doAdd = () =>
-      setItems((prev) => [
-        ...prev,
-        {
-          medicineName: medicine.name,
-          genericName: medicine.generic,
-          strength: medicine.strength,
-          dosage: '',
-          durationDays: 0,
-          timing: medicine.timing,
-          instructions: medicine.caution,
-        },
-      ]);
+      setRows((prev) => {
+        const idx = prev.findIndex((r) => !r.medicineName.trim());
+        if (idx >= 0) return prev.map((r, i) => (i === idx ? fill(r) : r));
+        return [...prev, fill(emptyRow())];
+      });
     const warnings = validateMedicine(medicine, diagnosis, complaint, riskFlags);
     if (warnings.some((w) => w.level === 'danger')) {
       showAlert(
@@ -174,6 +223,9 @@ export default function NewPrescriptionScreen() {
 
   const handleSave = async () => {
     if (!appointment || !doctor || !user) return;
+    const items: PrescriptionItem[] = rows
+      .filter((r) => r.medicineName.trim())
+      .map(({ _key, ...it }) => it);
     if (!patientName.trim() || !diagnosis.trim() || items.length === 0) {
       showAlert(t('prescriptions.validation_required'));
       return;
@@ -323,7 +375,7 @@ export default function NewPrescriptionScreen() {
               <Text className="font-bold text-slate-800">{t('prescriptions.suggestions')}</Text>
               <SuggestionPanel
                 result={suggestions}
-                addedNames={items.map((i) => i.medicineName)}
+                addedNames={rows.map((r) => r.medicineName)}
                 onAddMedicine={addMedicine}
                 onAddTests={addTests}
                 onAddAdvice={addAdvice}
@@ -331,26 +383,75 @@ export default function NewPrescriptionScreen() {
             </Card>
           )}
 
-          {/* Medicines */}
+          {/* Medicines table */}
           <Card className="p-4 gap-3">
-            <Text className="font-bold text-slate-800">{t('prescriptions.medicines')}</Text>
-            <MedicineSearchInput onSelect={addMedicine} />
-            {items.map((item, index) => (
-              <PrescriptionItemRow
-                key={item.medicineName}
-                index={index}
-                item={item}
-                warnings={itemWarnings[index] ?? []}
-                isLast={index === items.length - 1}
-                onChange={(next) =>
-                  setItems((prev) => prev.map((it, i) => (i === index ? next : it)))
-                }
-                onRemove={() => setItems((prev) => prev.filter((_, i) => i !== index))}
+            <View className="flex-row items-center gap-3">
+              <View className="w-9 h-9 rounded-xl bg-amber-50 items-center justify-center">
+                <Ionicons name="medkit" size={18} color="#F59E0B" />
+              </View>
+              <View className="flex-1">
+                <Text className="font-bold text-slate-800">{t('prescriptions.medicines')}</Text>
+                <Text className="text-xs text-slate-500">
+                  {t('prescriptions.medicines_subtitle')}
+                </Text>
+              </View>
+            </View>
+
+            {/* Column headers */}
+            <View className="flex-row gap-2 px-1 pt-1">
+              <Text style={{ flex: 2.4 }} className="text-[11px] font-semibold text-slate-500 uppercase">
+                {t('prescriptions.col_medicine')}
+              </Text>
+              <Text style={{ flex: 1.1 }} className="text-[11px] font-semibold text-slate-500 uppercase text-center">
+                {t('prescriptions.dosage')}
+              </Text>
+              <Text style={{ flex: 1.1 }} className="text-[11px] font-semibold text-slate-500 uppercase text-center">
+                {t('prescriptions.col_duration')}
+              </Text>
+              <Text style={{ flex: 1.6 }} className="text-[11px] font-semibold text-slate-500 uppercase">
+                {t('prescriptions.instructions')}
+              </Text>
+              <Text style={{ flex: 1 }} className="text-[11px] font-semibold text-slate-500 uppercase">
+                {t('prescriptions.col_status')}
+              </Text>
+              <View style={{ width: 26 }} />
+            </View>
+
+            {rows.map((row, i) => (
+              <MedicineTableRow
+                key={row._key}
+                row={row}
+                known={rowMeta[i]?.known ?? false}
+                warnings={rowMeta[i]?.warnings ?? []}
+                timingOptions={TIMING_OPTIONS}
+                canRemove={rows.length > 1}
+                onPatch={(patch) => patchRow(row._key, patch)}
+                onRemove={() => removeRow(row._key)}
+                onFocusRow={() => setFocusedKey(row._key)}
               />
             ))}
-            {items.length === 0 && (
-              <Text className="text-xs text-slate-400">{t('prescriptions.no_medicines_yet')}</Text>
-            )}
+
+            <TouchableOpacity
+              onPress={addRow}
+              className="border border-dashed border-slate-300 rounded-xl py-3 items-center flex-row justify-center gap-1.5"
+            >
+              <Ionicons name="add" size={16} color="#0D9488" />
+              <Text className="text-teal-600 text-sm font-semibold">{t('prescriptions.add_row')}</Text>
+            </TouchableOpacity>
+
+            {/* Quick dose chips */}
+            <View className="flex-row flex-wrap items-center gap-2">
+              <Text className="text-xs font-semibold text-slate-500">{t('prescriptions.quick_dose')}</Text>
+              {QUICK_DOSES.map((d) => (
+                <TouchableOpacity
+                  key={d}
+                  onPress={() => applyQuickDose(d)}
+                  className="bg-slate-100 rounded-lg px-2.5 py-1"
+                >
+                  <Text className="text-xs text-slate-600">{d}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </Card>
 
           {/* Tests, advice, follow-up */}
@@ -368,12 +469,10 @@ export default function NewPrescriptionScreen() {
               multiline
               className="min-h-[80px]"
             />
-            <Input
-              label={t('prescriptions.follow_up')}
-              value={followUpDate}
-              onChangeText={setFollowUpDate}
-              placeholder="YYYY-MM-DD"
-            />
+            <View className="gap-1">
+              <Text className="text-sm font-medium text-slate-700">{t('prescriptions.follow_up')}</Text>
+              <DateField value={followUpDate} onChange={setFollowUpDate} />
+            </View>
           </Card>
 
           <Button

@@ -294,6 +294,22 @@ export const MEDICINES: Medicine[] = [
     timing: 'Anytime', patientNote: 'Blood pressure medicine. Take daily.',
   },
   {
+    name: 'Nifedipine 20mg', generic: 'Nifedipine SR 20mg', category: 'Calcium Channel Blocker',
+    brand: 'Adalat/Nifin', strength: '20mg',
+    safe: { pregnancy: true, renal: true, hepatic: false, elderly: true, pediatric: false },
+    contraindications: ['Cardiogenic shock', 'Severe aortic stenosis'],
+    caution: 'Preferred CCB in pregnancy-induced hypertension. Use sustained-release form.',
+    timing: 'Anytime', patientNote: 'Blood pressure medicine, safe in pregnancy. Swallow whole — do not crush.',
+  },
+  {
+    name: 'Methyldopa 250mg', generic: 'Methyldopa 250mg', category: 'Centrally-Acting Antihypertensive',
+    brand: 'Aldomet/Aldopa', strength: '250mg',
+    safe: { pregnancy: true, renal: true, hepatic: false, elderly: true, pediatric: false },
+    contraindications: ['Active liver disease', 'Depression'],
+    caution: 'First-line antihypertensive in pregnancy. May cause drowsiness.',
+    timing: 'Twice/Thrice daily', patientNote: 'Blood pressure medicine, safe in pregnancy. May feel sleepy at first.',
+  },
+  {
     name: 'Atenolol 50mg', generic: 'Atenolol 50mg', category: 'Beta Blocker',
     brand: 'Tenolol/Aten', strength: '50mg',
     safe: { pregnancy: false, renal: false, hepatic: true, elderly: false, pediatric: false },

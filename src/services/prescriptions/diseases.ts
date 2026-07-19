@@ -147,7 +147,7 @@ export const DISEASES: Disease[] = [
         withCKD: ['ARB', 'ACE Inhibitor'],
         withHeartFailure: ['ACE Inhibitor', 'Beta Blocker', 'Loop Diuretic'],
         elderly: ['Calcium Channel Blocker', 'ARB'],
-        pregnancy: ['Calcium Channel Blocker'],
+        pregnancy: ['Centrally-Acting Antihypertensive', 'Calcium Channel Blocker'],
         asthma: ['Calcium Channel Blocker', 'ARB', 'ACE Inhibitor'],
       },
     },
@@ -402,7 +402,7 @@ export const DISEASES: Disease[] = [
     key: 'skin_infection',
     displayName: 'Skin / Soft Tissue Infection',
     icd10: 'L08.9',
-    aliases: ['skin infection', 'cellulitis', 'wound infection', 'abscess', 'infected wound'],
+    aliases: ['skin infection', 'soft tissue infection', 'cellulitis', 'wound infection', 'abscess', 'infected wound'],
     symptoms: ['Redness', 'Warmth', 'Swelling', 'Pain', 'Pus discharge', 'Fever'],
     categories: {
       firstLine: ['Cephalosporin Antibiotic', 'Penicillin Antibiotic', 'Topical Antifungal'],

@@ -11,6 +11,7 @@ import { cancelAppointmentReminder } from '../../src/services/notifications/appo
 import { ReviewModal } from '../../src/components/reviews/ReviewModal';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import { useAuth } from '../../src/hooks/useAuth';
+import { usePatientPrescriptions } from '../../src/hooks/usePrescriptions';
 import { formatAppointmentDate } from '../../src/utils/formatDate';
 import { showAlert } from '../../src/utils/alert';
 import type { Appointment } from '../../src/types/appointment';
@@ -31,6 +32,7 @@ export default function AppointmentsScreen() {
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const [reviewed, setReviewed] = useState<Record<string, boolean>>({});
   const [reviewTarget, setReviewTarget] = useState<Appointment | null>(null);
+  const { byAppointmentId: hasPrescription } = usePatientPrescriptions();
 
   // Real-time: doctor confirmations/completions appear without a refresh.
   useEffect(() => {
@@ -151,6 +153,15 @@ export default function AppointmentsScreen() {
                     className="border border-red-300 rounded-lg px-3 py-1.5"
                   >
                     <Text className="text-red-500 text-xs font-medium">{t('common.cancel')}</Text>
+                  </TouchableOpacity>
+                )}
+                {item.status === 'completed' && hasPrescription[item.id] && (
+                  <TouchableOpacity
+                    onPress={() => router.push(`/prescription/${item.id}`)}
+                    className="bg-teal-500 rounded-lg px-3 py-1.5 flex-row items-center gap-1"
+                  >
+                    <Ionicons name="document-text-outline" size={12} color="#fff" />
+                    <Text className="text-white text-xs font-medium">{t('prescriptions.view')}</Text>
                   </TouchableOpacity>
                 )}
                 {item.status === 'completed' && reviewed[item.id] === false && (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -12,6 +13,8 @@ import { Button } from '../../src/components/ui/Button';
 import { getUserRecords, addRecord, deleteRecord } from '../../src/services/firebase/firestore';
 import { uploadMedicalFile, FileTooLargeError, MAX_RECORD_FILE_BYTES } from '../../src/services/firebase/storage';
 import { useAuth } from '../../src/hooks/useAuth';
+import { usePatientPrescriptions } from '../../src/hooks/usePrescriptions';
+import { PrescriptionCard } from '../../src/components/prescriptions/PrescriptionCard';
 import { showAlert } from '../../src/utils/alert';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import type { MedicalRecord, RecordType } from '../../src/types/record';
@@ -39,7 +42,9 @@ interface PickedFile {
 
 export default function RecordsScreen() {
   const { t } = useTranslation();
+  const router = useRouter();
   const { user } = useAuth();
+  const { prescriptions } = usePatientPrescriptions();
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -206,6 +211,25 @@ export default function RecordsScreen() {
         data={records}
         keyExtractor={(r) => r.id}
         contentContainerStyle={{ padding: 16, gap: 10 }}
+        ListHeaderComponent={
+          prescriptions.length > 0 ? (
+            <View className="gap-2 mb-2">
+              <Text className="text-sm font-bold uppercase tracking-wide text-slate-500">
+                {t('prescriptions.doctor_prescriptions')}
+              </Text>
+              {prescriptions.map((p) => (
+                <PrescriptionCard
+                  key={p.id}
+                  prescription={p}
+                  onPress={() => router.push(`/prescription/${p.id}`)}
+                />
+              ))}
+              <Text className="text-sm font-bold uppercase tracking-wide text-slate-500 mt-3">
+                {t('records.title')}
+              </Text>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           !loading ? (
             <View className="items-center py-20 gap-2">

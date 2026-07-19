@@ -4,6 +4,7 @@ import {
   getDoc,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -23,6 +24,7 @@ import type { Doctor, DoctorFilter, Review } from '../../types/doctor';
 import type { Appointment, AppointmentStatus } from '../../types/appointment';
 import type { MedicalRecord } from '../../types/record';
 import type { MedicineReminder } from '../../types/medicine';
+import type { Prescription } from '../../types/prescription';
 
 // ── Doctors ──────────────────────────────────────────────────────────────────
 
@@ -358,4 +360,66 @@ export async function updateMedicine(
 
 export async function deleteMedicine(userId: string, medicineId: string): Promise<void> {
   await deleteDoc(doc(db, 'users', userId, 'medicines', medicineId));
+}
+
+// ── Prescriptions ────────────────────────────────────────────────────────────
+// Top-level collection; doc id == appointmentId, so each appointment gets at
+// most one prescription and lookup needs no query. Immutable once written
+// (rules deny update/delete). NOTE: never getDoc-probe for existence — the
+// owner-scoped read rule returns permission-denied for missing docs; derive
+// existence from the role-scoped list subscriptions instead.
+
+function sortPrescriptionsByDateDesc(prescriptions: Prescription[]): Prescription[] {
+  return [...prescriptions].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function createPrescription(
+  data: Omit<Prescription, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<string> {
+  await setDoc(doc(db, 'prescriptions', data.appointmentId), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return data.appointmentId;
+}
+
+export async function getPrescription(id: string): Promise<Prescription | null> {
+  const snap = await getDoc(doc(db, 'prescriptions', id));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as Prescription;
+}
+
+export function subscribePatientPrescriptions(
+  patientId: string,
+  onData: (prescriptions: Prescription[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    query(
+      collection(db, 'prescriptions'),
+      where('patientId', '==', patientId),
+      limit(50),
+    ),
+    (snap) =>
+      onData(sortPrescriptionsByDateDesc(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Prescription)))),
+    (err) => onError?.(err),
+  );
+}
+
+export function subscribeDoctorPrescriptions(
+  doctorUserId: string,
+  onData: (prescriptions: Prescription[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    query(
+      collection(db, 'prescriptions'),
+      where('doctorUserId', '==', doctorUserId),
+      limit(100),
+    ),
+    (snap) =>
+      onData(sortPrescriptionsByDateDesc(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Prescription)))),
+    (err) => onError?.(err),
+  );
 }

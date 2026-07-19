@@ -11,6 +11,7 @@ import {
   cancelAppointment,
 } from '../../src/services/firebase/firestore';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useDoctorPrescriptions } from '../../src/hooks/usePrescriptions';
 import { showAlert } from '../../src/utils/alert';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import { formatAppointmentDate } from '../../src/utils/formatDate';
@@ -27,10 +28,39 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function PrescriptionButton({
+  hasPrescription,
+  appointmentId,
+}: {
+  hasPrescription: boolean;
+  appointmentId: string;
+}) {
+  const { t } = useTranslation();
+  const router = useRouter();
+  return hasPrescription ? (
+    <TouchableOpacity
+      onPress={() => router.push(`/prescription/${appointmentId}`)}
+      className="border border-teal-500 rounded-lg px-3 py-2 flex-row items-center gap-1"
+    >
+      <Ionicons name="document-text-outline" size={12} color="#0D9488" />
+      <Text className="text-teal-600 text-xs font-semibold">{t('prescriptions.view')}</Text>
+    </TouchableOpacity>
+  ) : (
+    <TouchableOpacity
+      onPress={() => router.push(`/prescription/new?appointmentId=${appointmentId}`)}
+      className="bg-teal-600 rounded-lg px-3 py-2 flex-row items-center gap-1"
+    >
+      <Ionicons name="document-text" size={12} color="#fff" />
+      <Text className="text-white text-xs font-semibold">{t('prescriptions.write')}</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function DoctorAppointmentsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
+  const { byAppointmentId } = useDoctorPrescriptions();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -163,6 +193,10 @@ export default function DoctorAppointmentsScreen() {
                     >
                       <Text className="text-white text-xs font-semibold">{t('doctor_portal.mark_complete')}</Text>
                     </TouchableOpacity>
+                    <PrescriptionButton
+                      hasPrescription={!!byAppointmentId[item.id]}
+                      appointmentId={item.id}
+                    />
                   </>
                 )}
                 <TouchableOpacity
@@ -172,6 +206,15 @@ export default function DoctorAppointmentsScreen() {
                 >
                   <Text className="text-red-500 text-xs font-semibold">{t('common.cancel')}</Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {item.status === 'completed' && (
+              <View className="flex-row gap-2 pt-2 border-t border-slate-100">
+                <PrescriptionButton
+                  hasPrescription={!!byAppointmentId[item.id]}
+                  appointmentId={item.id}
+                />
               </View>
             )}
           </Card>

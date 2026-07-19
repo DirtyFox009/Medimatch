@@ -111,6 +111,36 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Prescriptions ────────────────────────────────────────────────────
+    // Doc id == appointmentId → exactly one prescription per appointment.
+    // Immutable once written: a prescription is a medical document of record.
+    match /prescriptions/{appointmentId} {
+      allow read: if authed()
+        && (resource.data.patientId == request.auth.uid
+            || resource.data.doctorUserId == request.auth.uid);
+      // Only the doctor who owns the appointment may issue its prescription,
+      // and the patientId must match the appointment's real patient.
+      allow create: if authed()
+        && request.resource.data.doctorUserId == request.auth.uid
+        && get(/databases/$(database)/documents/doctors/$(request.resource.data.doctorId)).data.get('userId', '') == request.auth.uid
+        && get(/databases/$(database)/documents/appointments/$(appointmentId)).data.get('doctorUserId', '') == request.auth.uid
+        && request.resource.data.patientId
+             == get(/databases/$(database)/documents/appointments/$(appointmentId)).data.patientId
+        && request.resource.data.appointmentId == appointmentId
+        && request.resource.data.keys().hasAll(
+             ['appointmentId', 'patientId', 'doctorId', 'doctorUserId',
+              'patientName', 'diagnosis', 'items', 'date'])
+        && request.resource.data.items is list
+        && request.resource.data.items.size() >= 1
+        && request.resource.data.items.size() <= 20
+        && request.resource.data.patientName is string
+        && request.resource.data.patientName.size() > 0
+        && request.resource.data.patientName.size() <= 200
+        && request.resource.data.diagnosis is string
+        && request.resource.data.diagnosis.size() <= 2000;
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

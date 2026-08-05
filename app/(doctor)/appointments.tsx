@@ -56,6 +56,20 @@ function PrescriptionButton({
   );
 }
 
+function ViewRecordsButton({ patientId }: { patientId: string }) {
+  const { t } = useTranslation();
+  const router = useRouter();
+  return (
+    <TouchableOpacity
+      onPress={() => router.push({ pathname: '/patient-records/[patientId]', params: { patientId } })}
+      className="border border-slate-300 rounded-lg px-3 py-2 flex-row items-center gap-1"
+    >
+      <Ionicons name="folder-outline" size={12} color="#475569" />
+      <Text className="text-slate-600 text-xs font-semibold">{t('doctor_portal.view_records')}</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function DoctorAppointmentsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -197,6 +211,7 @@ export default function DoctorAppointmentsScreen() {
                       hasPrescription={!!byAppointmentId[item.id]}
                       appointmentId={item.id}
                     />
+                    <ViewRecordsButton patientId={item.patientId} />
                   </>
                 )}
                 <TouchableOpacity
@@ -215,6 +230,7 @@ export default function DoctorAppointmentsScreen() {
                   hasPrescription={!!byAppointmentId[item.id]}
                   appointmentId={item.id}
                 />
+                <ViewRecordsButton patientId={item.patientId} />
               </View>
             )}
           </Card>

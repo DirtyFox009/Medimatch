@@ -240,7 +240,15 @@
     "no_appointments_today": "আজ কোনো অ্যাপয়েন্টমেন্ট নেই",
     "edit_profile": "প্রোফাইল সম্পাদনা",
     "profile_updated": "প্রোফাইল আপডেট হয়েছে",
-    "qualifications_hint": "কমা দিয়ে আলাদা করুন, যেমন MBBS, FCPS"
+    "qualifications_hint": "কমা দিয়ে আলাদা করুন, যেমন MBBS, FCPS",
+    "view_records": "রেকর্ড"
+  },
+  "patient_records": {
+    "title": "রোগীর রেকর্ড",
+    "subtitle": "রোগী যে মেডিকেল রেকর্ড শেয়ার করেছেন",
+    "no_records": "এই রোগীর এখনো কোনো রেকর্ড নেই",
+    "tap_to_view": "ফাইল খুলতে রেকর্ডে ট্যাপ করুন",
+    "cannot_open": "এই ফাইলটি খোলা যায়নি"
   },
   "prescriptions": {
     "title": "প্রেসক্রিপশন",

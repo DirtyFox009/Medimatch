@@ -190,6 +190,18 @@ export async function bookAppointment(
       bookedBy: data.patientId,
       appointmentId: appointmentRef.id,
     });
+
+    // Grant the booked doctor read access to this patient's medical records.
+    // Written by the patient (record owner) so the rules allow it; the doctor's
+    // records read is authorized against the existence of this deterministic
+    // doc (Firestore rules cannot query, only get/exists a known path).
+    if (data.doctorUserId) {
+      tx.set(doc(db, 'users', data.patientId, 'authorizedDoctors', data.doctorUserId), {
+        doctorUserId: data.doctorUserId,
+        doctorId: data.doctorId,
+        grantedAt: serverTimestamp(),
+      });
+    }
   });
 
   return appointmentRef.id;

@@ -240,7 +240,15 @@
     "no_appointments_today": "No appointments today",
     "edit_profile": "Edit Profile",
     "profile_updated": "Profile updated",
-    "qualifications_hint": "Separate with commas, e.g. MBBS, FCPS"
+    "qualifications_hint": "Separate with commas, e.g. MBBS, FCPS",
+    "view_records": "Records"
+  },
+  "patient_records": {
+    "title": "Patient Records",
+    "subtitle": "Medical records this patient has shared",
+    "no_records": "This patient has no records yet",
+    "tap_to_view": "Tap a record to open its file",
+    "cannot_open": "Could not open this file"
   },
   "prescriptions": {
     "title": "Prescription",

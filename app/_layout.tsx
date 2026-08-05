@@ -64,6 +64,7 @@ export default function RootLayout() {
           <Stack.Screen name="telemedicine/[appointmentId]" options={{ headerShown: true, title: 'Video Consultation' }} />
           <Stack.Screen name="prescription/new" options={{ headerShown: true, title: 'Write Prescription', headerBackTitle: 'Back' }} />
           <Stack.Screen name="prescription/[id]" options={{ headerShown: true, title: 'Prescription', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="patient-records/[patientId]" options={{ headerShown: true, title: 'Patient Records', headerBackTitle: 'Back' }} />
           <Stack.Screen name="medicines" options={{ headerShown: true, title: 'Medicine Reminders' }} />
           <Stack.Screen name="emergency" options={{ headerShown: false }} />
           <Stack.Screen name="privacy" options={{ headerShown: true, title: 'Privacy Policy' }} />

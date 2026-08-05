@@ -10,17 +10,15 @@ interface SuggestionPanelProps {
   /** Names of medicines already on the prescription (hidden from suggestions). */
   addedNames: string[];
   onAddMedicine: (medicine: Medicine) => void;
-  onAddTests: (tests: string[]) => void;
-  onAddAdvice: (advice: string) => void;
 }
 
-export function SuggestionPanel({
-  result,
-  addedNames,
-  onAddMedicine,
-  onAddTests,
-  onAddAdvice,
-}: SuggestionPanelProps) {
+/**
+ * Matched diseases, emergency flags, and suggested medicines only.
+ * Suggested tests / advice now live next to their own form fields
+ * (see SuggestedTests / SuggestedAdvice below) so the doctor sees the
+ * suggestion right where they'll use it.
+ */
+export function SuggestionPanel({ result, addedNames, onAddMedicine }: SuggestionPanelProps) {
   const { t } = useTranslation();
   if (result.diseases.length === 0) return null;
 
@@ -109,48 +107,113 @@ export function SuggestionPanel({
           ))}
         </View>
       )}
+    </View>
+  );
+}
 
-      {/* Suggested tests */}
-      {result.tests.length > 0 && (
-        <View className="gap-2">
-          <View className="flex-row items-center justify-between">
-            <Text className="text-xs font-semibold text-slate-500 uppercase">
-              {t('prescriptions.suggested_tests')}
+interface SuggestedTestsProps {
+  tests: string[];
+  /** Tests already present in the Investigations field, so we can show them as added. */
+  addedTests: string[];
+  /** Add a single test. */
+  onAddTest: (test: string) => void;
+  /** Add every suggested test at once. */
+  onAddAll: () => void;
+}
+
+/**
+ * Chip list of suggested investigations, placed directly above the
+ * Investigations field. Each chip adds just that one test on tap;
+ * "Add all" remains for doctors who want everything at once.
+ * Already-added tests show a checkmark and can't be re-added.
+ */
+export function SuggestedTests({ tests, addedTests, onAddTest, onAddAll }: SuggestedTestsProps) {
+  const { t } = useTranslation();
+  if (tests.length === 0) return null;
+
+  const allAdded = tests.every((test) => addedTests.includes(test));
+
+  return (
+    <View className="gap-2">
+      <View className="flex-row items-center justify-between">
+        <Text className="text-xs font-semibold text-slate-500 uppercase">
+          {t('prescriptions.suggested_tests')}
+        </Text>
+        {!allAdded && (
+          <TouchableOpacity onPress={onAddAll}>
+            <Text className="text-teal-600 text-xs font-semibold">
+              {t('prescriptions.add_all')}
             </Text>
-            <TouchableOpacity onPress={() => onAddTests(result.tests)}>
-              <Text className="text-teal-600 text-xs font-semibold">
-                {t('prescriptions.add_all')}
+          </TouchableOpacity>
+        )}
+      </View>
+      <View className="flex-row flex-wrap gap-2">
+        {tests.map((test) => {
+          const added = addedTests.includes(test);
+          return (
+            <TouchableOpacity
+              key={test}
+              disabled={added}
+              onPress={() => onAddTest(test)}
+              className={`flex-row items-center gap-1 px-3 py-1 rounded-full ${
+                added ? 'bg-teal-50' : 'bg-primary-50'
+              }`}
+            >
+              {added && <Ionicons name="checkmark-circle" size={14} color="#0D9488" />}
+              <Text
+                className={`text-sm font-medium ${added ? 'text-teal-600' : 'text-primary-700'}`}
+              >
+                {test}
               </Text>
             </TouchableOpacity>
-          </View>
-          <View className="flex-row flex-wrap gap-2">
-            {result.tests.map((test) => (
-              <View key={test} className="bg-primary-50 px-3 py-1 rounded-full">
-                <Text className="text-primary-700 text-sm font-medium">{test}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
-      {/* Suggested advice */}
-      {result.advice.length > 0 && (
-        <View className="gap-2">
-          <Text className="text-xs font-semibold text-slate-500 uppercase">
-            {t('prescriptions.suggested_advice')}
-          </Text>
-          {result.advice.map((line) => (
-            <TouchableOpacity
-              key={line}
-              onPress={() => onAddAdvice(line)}
-              className="flex-row items-center gap-1.5"
-            >
-              <Ionicons name="add-circle-outline" size={14} color="#0D9488" />
-              <Text className="text-xs text-slate-600 flex-1">{line}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+interface SuggestedAdviceProps {
+  advice: string[];
+  /** Advice lines already present in the Advice field. */
+  addedAdvice: string[];
+  onAddAdvice: (line: string) => void;
+}
+
+/**
+ * List of suggested advice lines, placed directly above the Advice field.
+ * Each line adds itself on tap; already-added lines show a checkmark
+ * and can't be re-added (no duplicate lines cluttering the note).
+ */
+export function SuggestedAdvice({ advice, addedAdvice, onAddAdvice }: SuggestedAdviceProps) {
+  const { t } = useTranslation();
+  if (advice.length === 0) return null;
+
+  return (
+    <View className="gap-2">
+      <Text className="text-xs font-semibold text-slate-500 uppercase">
+        {t('prescriptions.suggested_advice')}
+      </Text>
+      {advice.map((line) => {
+        const added = addedAdvice.includes(line);
+        return (
+          <TouchableOpacity
+            key={line}
+            disabled={added}
+            onPress={() => onAddAdvice(line)}
+            className="flex-row items-center gap-1.5"
+          >
+            <Ionicons
+              name={added ? 'checkmark-circle' : 'add-circle-outline'}
+              size={14}
+              color="#0D9488"
+            />
+            <Text className={`text-xs flex-1 ${added ? 'text-teal-600' : 'text-slate-600'}`}>
+              {line}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }

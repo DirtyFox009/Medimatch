@@ -70,6 +70,7 @@ export default function BookingScreen() {
         // Doctors confirm bookings from their portal.
         status: 'pending',
         chatSummary: attachSymptoms && triageResult ? triageResult.recommendation : null,
+        possibleConditions: attachSymptoms && triageResult ? triageResult.conditions : null,
         severity: attachSymptoms && triageResult ? triageResult.severity : null,
         notes: '',
         telemedicineRoomId: apptType === 'telemedicine' ? randomRoomId() : null,

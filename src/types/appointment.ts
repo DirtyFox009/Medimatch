@@ -18,6 +18,7 @@ export interface Appointment {
   fee: number;
   status: AppointmentStatus;
   chatSummary: string | null;
+  possibleConditions: string[] | null;
   severity: Severity | null;
   notes: string;
   telemedicineRoomId: string | null;

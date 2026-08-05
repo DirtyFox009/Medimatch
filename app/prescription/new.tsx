@@ -10,7 +10,11 @@ import { Input } from '../../src/components/ui/Input';
 import { DateField } from '../../src/components/ui/DateField';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import { RiskFactorToggles } from '../../src/components/prescriptions/RiskFactorToggles';
-import { SuggestionPanel } from '../../src/components/prescriptions/SuggestionPanel';
+import {
+  SuggestionPanel,
+  SuggestedTests,
+  SuggestedAdvice,
+} from '../../src/components/prescriptions/SuggestionPanel';
 import {
   MedicineTableRow,
   type EditableItem,
@@ -22,6 +26,7 @@ import {
   getAppointment,
   getDoctor,
 } from '../../src/services/firebase/firestore';
+import { getUserProfile } from '../../src/services/firebase/auth';
 import {
   EMPTY_RISK_FLAGS,
   getSuggestions,
@@ -114,7 +119,21 @@ export default function NewPrescriptionScreen() {
         } else {
           setAppointment(appt);
           setDoctor(doc);
-          if (appt.chatSummary) setComplaint(appt.chatSummary);
+          if (appt.possibleConditions?.length) {
+            setComplaint(appt.possibleConditions.join(', '));
+          } else if (appt.chatSummary) {
+            setComplaint(appt.chatSummary);
+          }
+          // Prefilling the name is a convenience, not a requirement — a denied
+          // profile read (rules not yet published) must not blank the whole form.
+          try {
+            const patientProfile = await getUserProfile(appt.patientId);
+            if (active && patientProfile?.displayName) {
+              setPatientName(patientProfile.displayName);
+            }
+          } catch (e) {
+            console.warn('[NewPrescription] patient profile lookup failed:', e);
+          }
         }
       } catch (e) {
         console.error('[NewPrescription] load error:', e);
@@ -220,6 +239,16 @@ export default function NewPrescriptionScreen() {
     if (advice.includes(line)) return;
     setAdvice((prev) => (prev ? `${prev}\n${line}` : line));
   };
+
+  const addedTests = tests
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const addedAdvice = advice
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   const handleSave = async () => {
     if (!appointment || !doctor || !user) return;
@@ -377,8 +406,6 @@ export default function NewPrescriptionScreen() {
                 result={suggestions}
                 addedNames={rows.map((r) => r.medicineName)}
                 onAddMedicine={addMedicine}
-                onAddTests={addTests}
-                onAddAdvice={addAdvice}
               />
             </Card>
           )}
@@ -456,11 +483,22 @@ export default function NewPrescriptionScreen() {
 
           {/* Tests, advice, follow-up */}
           <Card className="p-4 gap-3">
+            <SuggestedTests
+              tests={suggestions.tests}
+              addedTests={addedTests}
+              onAddTest={(test) => addTests([test])}
+              onAddAll={() => addTests(suggestions.tests)}
+            />
             <Input
               label={t('prescriptions.tests')}
               value={tests}
               onChangeText={setTests}
               placeholder="CBC, CRP"
+            />
+            <SuggestedAdvice
+              advice={suggestions.advice}
+              addedAdvice={addedAdvice}
+              onAddAdvice={addAdvice}
             />
             <Input
               label={t('prescriptions.advice')}

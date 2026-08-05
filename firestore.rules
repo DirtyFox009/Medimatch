@@ -7,7 +7,12 @@ service cloud.firestore {
 
     // ── User profiles ────────────────────────────────────────────────────
     match /users/{uid} {
-      allow read: if isOwner(uid);
+      // The owner reads their own profile; a doctor the patient has booked may
+      // also read it (the Rx screen prefills the patient's name). Authorized by
+      // the same grant doc as records — never a blanket doctor-role read, which
+      // would expose every user profile to every doctor account.
+      allow read: if isOwner(uid)
+        || exists(/databases/$(database)/documents/users/$(uid)/authorizedDoctors/$(request.auth.uid));
       // Self-signup may only create a patient profile; doctor accounts are
       // provisioned by the admin script (scripts/provisionDoctorAccounts.ts).
       allow create: if isOwner(uid)

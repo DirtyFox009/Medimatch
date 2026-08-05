@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getDoctors, getDoctor, getDoctorReviews } from '../services/firebase/firestore';
+import { getDoctors, getDoctor, getDoctorReviews, subscribeDoctor } from '../services/firebase/firestore';
 import { useAuth } from './useAuth';
 import type { Doctor, DoctorFilter, Review } from '../types/doctor';
 
@@ -56,4 +56,39 @@ export function useDoctor(id: string) {
   }, [id]);
 
   return { doctor, reviews, loading };
+}
+
+/**
+ * Live doctor doc, without the reviews `useDoctor` also fetches. Used where a
+ * capacity change must land without a reload: the booking grid and the doctor's
+ * own portal.
+ */
+export function useDoctorLive(id: string | null | undefined) {
+  const [doctor, setDoctor] = useState<Doctor | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) {
+      setDoctor(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const unsubscribe = subscribeDoctor(
+      id,
+      (d) => {
+        setDoctor(d);
+        setLoading(false);
+      },
+      (e) => {
+        console.error('[useDoctorLive] error:', e);
+        setError('Failed to load doctor');
+        setLoading(false);
+      },
+    );
+    return unsubscribe;
+  }, [id]);
+
+  return { doctor, loading, error };
 }

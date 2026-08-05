@@ -463,6 +463,14 @@ const DOCTORS = [
   },
 ];
 
+/**
+ * ⚠️ FRESH PROJECTS ONLY — batch.set below replaces each doctor doc wholesale
+ * (no { merge: true }), which would wipe the `userId`/`email` that
+ * provisionDoctorAccounts.ts writes back, breaking every doctor login and
+ * orphaning every appointment's doctorUserId. Do not re-run against a live
+ * project. Existing docs need no backfill: readCapacity() in utils/capacity.ts
+ * defaults the chamber fields from timeSlots, reproducing the old grid exactly.
+ */
 async function seed() {
   const batch = db.batch();
   for (const doctor of DOCTORS) {
@@ -470,6 +478,12 @@ async function seed() {
     const ref = db.collection('doctors').doc(id);
     batch.set(ref, {
       ...data,
+      // Chamber capacity, matching each doctor's hand-written timeSlots.
+      autoConfirm: true,
+      chamberStart: data.timeSlots[0],
+      slotDurationMins: 30,
+      dailyPatientLimit: data.timeSlots.length,
+      dailyLimitOverrides: {},
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });

@@ -7,11 +7,18 @@ export function formatAppointmentDate(dateStr: string): string {
   return format(date, 'EEE, d MMM yyyy');
 }
 
+/** Today in the device's local timezone — matches getAvailableDates and booking dates. */
+export function todayISO(): string {
+  return format(new Date(), 'yyyy-MM-dd');
+}
+
 export function getAvailableDates(availableDays: string[], count = 14): string[] {
   const dayMap: Record<string, number> = {
     Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
   };
   const days = availableDays.map((d) => dayMap[d]).filter((d) => d !== undefined);
+  // No recognised days would spin the while-loop below forever.
+  if (days.length === 0) return [];
   const results: string[] = [];
   let cursor = new Date();
   cursor.setHours(0, 0, 0, 0);

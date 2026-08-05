@@ -22,7 +22,9 @@
     "taka": "৳",
     "edit": "Edit",
     "any": "Any",
-    "add": "Add"
+    "add": "Add",
+    "on": "On",
+    "off": "Off"
   },
   "nav": {
     "home": "Home",
@@ -136,7 +138,8 @@
     "available_days": "Available Days",
     "about": "About",
     "fee_before_booking": "Consultation fee: ৳{{fee}} — payable at clinic",
-    "telemedicine_fee_note": "Telemedicine fee: ৳{{fee}} — payable online"
+    "telemedicine_fee_note": "Telemedicine fee: ৳{{fee}} — payable online",
+    "pick_a_day": "Select at least one available day"
   },
   "booking": {
     "title": "Book Appointment",
@@ -159,7 +162,18 @@
     "summary_time": "Time",
     "booking_details": "Booking Details",
     "total_fee": "Total Fee",
-    "view_appointments": "View My Appointments"
+    "view_appointments": "View My Appointments",
+    "booking_requested": "Booking Requested",
+    "awaiting_confirmation": "The doctor will confirm your appointment shortly",
+    "day_full": "This doctor is fully booked for that day. Please choose another date.",
+    "doctor_unavailable": "This doctor is not accepting bookings right now.",
+    "booking_failed": "Could not confirm booking. Please try again.",
+    "slot_expired": "That time has passed. Please choose another slot.",
+    "slots_left": "{{count}} left",
+    "full": "Full",
+    "taken": "Booked",
+    "no_slots_left": "No slots left for this date",
+    "no_dates_available": "This doctor has no open dates right now"
   },
   "appointments": {
     "title": "My Appointments",
@@ -258,7 +272,26 @@
     "edit_profile": "Edit Profile",
     "profile_updated": "Profile updated",
     "qualifications_hint": "Separate with commas, e.g. MBBS, FCPS",
-    "view_records": "Records"
+    "view_records": "Records",
+    "capacity": "Chamber & Capacity",
+    "edit_capacity": "Edit Capacity",
+    "chamber_start": "Chamber starts at",
+    "chamber_hours": "Chamber hours",
+    "minutes_per_patient": "Minutes per patient",
+    "patients_per_day": "Patients per day",
+    "patients_per_day_invalid": "Enter a number between 1 and {{max}}",
+    "chamber_start_invalid": "Those settings produce no slots — check the start time",
+    "slot_preview": "{{count}} slots · {{first}} – {{last}}",
+    "regenerate_warning": "Saving replaces your slot times. Appointments already booked keep their original time.",
+    "auto_confirm": "Auto-confirm bookings",
+    "auto_confirm_hint": "Bookings are confirmed instantly. Turn off to approve each one yourself.",
+    "auto_confirm_on": "Auto-confirm on",
+    "auto_confirm_off": "Manual approval",
+    "todays_capacity": "Today's capacity",
+    "patients_today": "patients today",
+    "booked_of_limit": "{{booked}} booked · limit {{limit}} · {{left}} slots left",
+    "no_new_bookings_today": "{{booked}} booked · limit {{limit}} · no new bookings today",
+    "reset_to_default": "Reset"
   },
   "patient_records": {
     "title": "Patient Records",

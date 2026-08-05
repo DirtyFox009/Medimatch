@@ -20,6 +20,8 @@
     "view_all": "সব দেখুন",
     "no_results": "কোনো ফলাফল পাওয়া যায়নি",
     "taka": "৳",
+    "on": "চালু",
+    "off": "বন্ধ",
     "edit": "সম্পাদনা",
     "any": "যেকোনো",
     "add": "যোগ করুন"
@@ -136,7 +138,8 @@
     "available_days": "উপলব্ধ দিন",
     "about": "পরিচিতি",
     "fee_before_booking": "পরামর্শ ফি: ৳{{fee}} — ক্লিনিকে পরিশোধযোগ্য",
-    "telemedicine_fee_note": "টেলিমেডিসিন ফি: ৳{{fee}} — অনলাইনে পরিশোধযোগ্য"
+    "telemedicine_fee_note": "টেলিমেডিসিন ফি: ৳{{fee}} — অনলাইনে পরিশোধযোগ্য",
+    "pick_a_day": "অন্তত একটি উপলব্ধ দিন নির্বাচন করুন"
   },
   "booking": {
     "title": "অ্যাপয়েন্টমেন্ট বুক করুন",
@@ -159,7 +162,18 @@
     "summary_time": "সময়",
     "booking_details": "বুকিং বিবরণ",
     "total_fee": "মোট ফি",
-    "view_appointments": "আমার অ্যাপয়েন্টমেন্ট দেখুন"
+    "view_appointments": "আমার অ্যাপয়েন্টমেন্ট দেখুন",
+    "booking_requested": "বুকিং অনুরোধ পাঠানো হয়েছে",
+    "awaiting_confirmation": "ডাক্তার শীঘ্রই আপনার অ্যাপয়েন্টমেন্ট নিশ্চিত করবেন",
+    "day_full": "এই ডাক্তারের ওই দিনের সব সিরিয়াল পূর্ণ। অন্য একটি তারিখ বেছে নিন।",
+    "doctor_unavailable": "এই ডাক্তার এখন বুকিং নিচ্ছেন না।",
+    "booking_failed": "বুকিং নিশ্চিত করা যায়নি। আবার চেষ্টা করুন।",
+    "slot_expired": "এই সময়টি পার হয়ে গেছে। অন্য একটি সময় বেছে নিন।",
+    "slots_left": "{{count}}টি বাকি",
+    "full": "পূর্ণ",
+    "taken": "বুক হয়েছে",
+    "no_slots_left": "এই তারিখে কোনো সময় খালি নেই",
+    "no_dates_available": "এই ডাক্তারের এখন কোনো খালি তারিখ নেই"
   },
   "appointments": {
     "title": "আমার অ্যাপয়েন্টমেন্ট",
@@ -258,7 +272,26 @@
     "edit_profile": "প্রোফাইল সম্পাদনা",
     "profile_updated": "প্রোফাইল আপডেট হয়েছে",
     "qualifications_hint": "কমা দিয়ে আলাদা করুন, যেমন MBBS, FCPS",
-    "view_records": "রেকর্ড"
+    "view_records": "রেকর্ড",
+    "capacity": "চেম্বার ও রোগীর সংখ্যা",
+    "edit_capacity": "সম্পাদনা করুন",
+    "chamber_start": "চেম্বার শুরু",
+    "chamber_hours": "চেম্বারের সময়",
+    "minutes_per_patient": "প্রতি রোগীর জন্য মিনিট",
+    "patients_per_day": "দৈনিক রোগীর সংখ্যা",
+    "patients_per_day_invalid": "১ থেকে {{max}} এর মধ্যে একটি সংখ্যা দিন",
+    "chamber_start_invalid": "এই সেটিংসে কোনো সময় তৈরি হয় না — শুরুর সময় দেখুন",
+    "slot_preview": "{{count}}টি সময় · {{first}} – {{last}}",
+    "regenerate_warning": "সেভ করলে আপনার সময়সূচি নতুন করে তৈরি হবে। আগে বুক হওয়া অ্যাপয়েন্টমেন্টের সময় অপরিবর্তিত থাকবে।",
+    "auto_confirm": "স্বয়ংক্রিয় নিশ্চিতকরণ",
+    "auto_confirm_hint": "বুকিং সঙ্গে সঙ্গে নিশ্চিত হবে। নিজে অনুমোদন করতে চাইলে বন্ধ করুন।",
+    "auto_confirm_on": "স্বয়ংক্রিয় নিশ্চিতকরণ চালু",
+    "auto_confirm_off": "নিজে অনুমোদন",
+    "todays_capacity": "আজকের রোগীর সংখ্যা",
+    "patients_today": "জন রোগী আজ",
+    "booked_of_limit": "{{booked}} জন বুক করেছেন · সীমা {{limit}} · {{left}}টি বাকি",
+    "no_new_bookings_today": "{{booked}} জন বুক করেছেন · সীমা {{limit}} · আজ আর নতুন বুকিং নয়",
+    "reset_to_default": "রিসেট"
   },
   "patient_records": {
     "title": "রোগীর রেকর্ড",

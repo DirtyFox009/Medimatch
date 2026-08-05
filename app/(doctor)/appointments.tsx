@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, SectionList, TouchableOpacity } from 'react-native';
+import { View, Text, SectionList, TouchableOpacity, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -9,12 +9,15 @@ import {
   subscribeDoctorAppointments,
   updateAppointmentStatus,
   cancelAppointment,
+  setDayLimit,
 } from '../../src/services/firebase/firestore';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useDoctorLive } from '../../src/hooks/useDoctors';
 import { useDoctorPrescriptions } from '../../src/hooks/usePrescriptions';
 import { showAlert } from '../../src/utils/alert';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
-import { formatAppointmentDate } from '../../src/utils/formatDate';
+import { formatAppointmentDate, todayISO } from '../../src/utils/formatDate';
+import { readCapacity, effectiveLimit, MAX_DAILY_PATIENTS } from '../../src/utils/capacity';
 import type { Appointment } from '../../src/types/appointment';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -23,10 +26,6 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'text-red-500',
   completed: 'text-slate-500',
 };
-
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function PrescriptionButton({
   hasPrescription,
@@ -73,10 +72,13 @@ function ViewRecordsButton({ patientId }: { patientId: string }) {
 export default function DoctorAppointmentsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, appUser } = useAuth();
+  const { doctor } = useDoctorLive(appUser?.doctorId);
   const { byAppointmentId } = useDoctorPrescriptions();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [limitDraft, setLimitDraft] = useState<string | null>(null);
+  const [savingLimit, setSavingLimit] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -85,7 +87,7 @@ export default function DoctorAppointmentsScreen() {
   }, [user]);
 
   const sections = useMemo(() => {
-    const today = todayStr();
+    const today = todayISO();
     const active = (a: Appointment) => a.status === 'pending' || a.status === 'confirmed';
     const todayList = appointments.filter((a) => active(a) && a.date === today);
     const upcomingList = appointments.filter((a) => active(a) && a.date > today);
@@ -96,6 +98,35 @@ export default function DoctorAppointmentsScreen() {
       { title: t('doctor_portal.past'), data: pastList },
     ].filter((s) => s.data.length > 0 || s.emptyKey);
   }, [appointments, t]);
+
+  // Today's capacity. The booked count comes from the already-subscribed
+  // appointments list, so this costs no extra reads; it agrees with the slot
+  // ledger because cancelAppointment deletes the slot doc in the same batch.
+  const capacity = readCapacity(doctor);
+  const today = todayISO();
+  const todayLimit = effectiveLimit(capacity, today);
+  const hasOverride = typeof capacity.dailyLimitOverrides[today] === 'number';
+  const bookedToday = appointments.filter(
+    (a) => a.date === today && (a.status === 'pending' || a.status === 'confirmed'),
+  ).length;
+  const slotsLeftToday = Math.max(todayLimit - bookedToday, 0);
+
+  const saveTodayLimit = async (value: number | null) => {
+    if (!doctor) return;
+    if (value !== null && (!Number.isInteger(value) || value < 0 || value > MAX_DAILY_PATIENTS)) {
+      showAlert(t('common.error'), t('doctor_portal.patients_per_day_invalid', { max: MAX_DAILY_PATIENTS }));
+      return;
+    }
+    setSavingLimit(true);
+    try {
+      await setDayLimit(doctor.id, capacity.dailyLimitOverrides, today, value);
+      setLimitDraft(null);
+    } catch {
+      showAlert(t('common.error'));
+    } finally {
+      setSavingLimit(false);
+    }
+  };
 
   const act = async (fn: () => Promise<void>, id: string) => {
     setBusyId(id);
@@ -127,6 +158,55 @@ export default function DoctorAppointmentsScreen() {
         keyExtractor={(a) => a.id}
         contentContainerStyle={{ padding: 16, gap: 12 }}
         stickySectionHeadersEnabled={false}
+        ListHeaderComponent={
+          doctor ? (
+            <Card className="p-4 gap-3">
+              <View className="flex-row items-center justify-between">
+                <Text className="font-semibold text-slate-800">{t('doctor_portal.todays_capacity')}</Text>
+                <View className={`px-2.5 py-1 rounded-full ${capacity.autoConfirm ? 'bg-green-100' : 'bg-amber-100'}`}>
+                  <Text className={`text-[10px] font-semibold ${capacity.autoConfirm ? 'text-green-700' : 'text-amber-700'}`}>
+                    {t(capacity.autoConfirm ? 'doctor_portal.auto_confirm_on' : 'doctor_portal.auto_confirm_off')}
+                  </Text>
+                </View>
+              </View>
+
+              <View className="flex-row items-center gap-2">
+                <TextInput
+                  value={limitDraft ?? String(todayLimit)}
+                  onChangeText={setLimitDraft}
+                  keyboardType="numeric"
+                  editable={!savingLimit}
+                  className="border border-slate-200 rounded-lg px-3 py-2 text-slate-800 w-20 text-center bg-white"
+                />
+                <Text className="text-slate-500 text-sm flex-1">{t('doctor_portal.patients_today')}</Text>
+                {limitDraft !== null && limitDraft !== String(todayLimit) && (
+                  <TouchableOpacity
+                    disabled={savingLimit}
+                    onPress={() => saveTodayLimit(Number(limitDraft))}
+                    className="bg-teal-600 rounded-lg px-3 py-2"
+                  >
+                    <Text className="text-white text-xs font-semibold">{t('common.save')}</Text>
+                  </TouchableOpacity>
+                )}
+                {hasOverride && limitDraft === null && (
+                  <TouchableOpacity
+                    disabled={savingLimit}
+                    onPress={() => saveTodayLimit(null)}
+                    className="border border-slate-300 rounded-lg px-3 py-2"
+                  >
+                    <Text className="text-slate-600 text-xs font-semibold">{t('doctor_portal.reset_to_default')}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <Text className={`text-xs ${bookedToday >= todayLimit ? 'text-amber-600 font-medium' : 'text-slate-500'}`}>
+                {bookedToday >= todayLimit
+                  ? t('doctor_portal.no_new_bookings_today', { booked: bookedToday, limit: todayLimit })
+                  : t('doctor_portal.booked_of_limit', { booked: bookedToday, limit: todayLimit, left: slotsLeftToday })}
+              </Text>
+            </Card>
+          ) : null
+        }
         renderSectionHeader={({ section }) => (
           <View className="pt-2 pb-1 flex-row items-center justify-between">
             <Text className="text-sm font-bold uppercase tracking-wide text-slate-500">{section.title}</Text>

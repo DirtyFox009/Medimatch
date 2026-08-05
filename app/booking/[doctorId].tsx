@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,14 +8,15 @@ import * as Crypto from 'expo-crypto';
 import { Button } from '../../src/components/ui/Button';
 import { Card } from '../../src/components/ui/Card';
 import { Avatar } from '../../src/components/ui/Avatar';
-import { useDoctor } from '../../src/hooks/useDoctors';
+import { useDoctorLive } from '../../src/hooks/useDoctors';
 import { useAuth } from '../../src/hooks/useAuth';
-import { bookAppointment, subscribeBookedSlots } from '../../src/services/firebase/firestore';
+import { bookAppointment, subscribeBookedSlotsRange } from '../../src/services/firebase/firestore';
 import { scheduleAppointmentReminder } from '../../src/services/notifications/appointmentReminders';
-import { getAvailableDates, formatAppointmentDate } from '../../src/utils/formatDate';
+import { getAvailableDates, formatAppointmentDate, todayISO } from '../../src/utils/formatDate';
+import { bookableSlots, slotsForDate } from '../../src/utils/capacity';
 import { showAlert } from '../../src/utils/alert';
 import { useChatStore } from '../../src/store/chatStore';
-import type { AppointmentType } from '../../src/types/appointment';
+import type { AppointmentType, AppointmentStatus } from '../../src/types/appointment';
 
 function randomRoomId(): string {
   const bytes = Crypto.getRandomBytes(12);
@@ -24,7 +25,8 @@ function randomRoomId(): string {
 
 export default function BookingScreen() {
   const { doctorId, type: initialType } = useLocalSearchParams<{ doctorId: string; type?: string }>();
-  const { doctor, loading } = useDoctor(doctorId);
+  // Live, so a doctor lowering today's limit shrinks the grid under an open screen.
+  const { doctor, loading } = useDoctorLive(doctorId);
   const { user } = useAuth();
   const { t } = useTranslation();
   const router = useRouter();
@@ -35,27 +37,70 @@ export default function BookingScreen() {
   );
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [bookedByDate, setBookedByDate] = useState<Record<string, string[]>>({});
   const [attachSymptoms, setAttachSymptoms] = useState(!!triageResult);
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [bookedStatus, setBookedStatus] = useState<AppointmentStatus>('confirmed');
 
-  const availableDates = doctor ? getAvailableDates(doctor.availableDays, 14) : [];
+  const doctorDays = doctor?.availableDays;
+  const candidateDates = useMemo(
+    () => (doctorDays ? getAvailableDates(doctorDays, 14) : []),
+    [doctorDays],
+  );
 
-  // Live subscription: slots booked by other patients grey out in real time.
+  // One range subscription covers the whole date strip, so a fully-booked day can
+  // be marked up front and switching dates never shows the previous date's slots.
   useEffect(() => {
-    if (!doctor || !selectedDate) return;
-    const unsubscribe = subscribeBookedSlots(doctor.id, selectedDate, setBookedSlots);
+    if (!doctor || candidateDates.length === 0) return;
+    const unsubscribe = subscribeBookedSlotsRange(
+      doctor.id,
+      candidateDates[0],
+      candidateDates[candidateDates.length - 1],
+      setBookedByDate,
+      (e) => console.error('[booking] slot subscription failed:', e),
+    );
     return unsubscribe;
-  }, [doctor, selectedDate]);
+  }, [doctor?.id, candidateDates]);
+
+  // Slots left per date, after the capacity limit, existing bookings, and (for
+  // today) the slots that have already passed.
+  const openByDate = useMemo(() => {
+    const now = new Date();
+    const map: Record<string, string[]> = {};
+    candidateDates.forEach((date) => {
+      map[date] = bookableSlots(doctor, date, bookedByDate[date] ?? [], now);
+    });
+    return map;
+  }, [doctor, candidateDates, bookedByDate]);
+
+  // Today disappears once its chamber hours are over — "Full" would misdescribe it.
+  const availableDates = useMemo(
+    () => candidateDates.filter((d) => d !== todayISO() || openByDate[d]?.length > 0),
+    [candidateDates, openByDate],
+  );
+
+  const openSlots = selectedDate ? openByDate[selectedDate] ?? [] : [];
+  const bookedSlots = selectedDate ? bookedByDate[selectedDate] ?? [] : [];
+
+  // A slot picked for one date must not stay selected after switching dates.
+  useEffect(() => {
+    setSelectedSlot(null);
+  }, [selectedDate]);
 
   const fee = doctor ? (apptType === 'telemedicine' ? doctor.telemedicineFee : doctor.consultationFee) : 0;
 
   const handleConfirm = async () => {
     if (!user || !doctor || !selectedDate || !selectedSlot) return;
+    // The screen can sit open across the lead-time boundary.
+    if (!openSlots.includes(selectedSlot)) {
+      showAlert(t('common.error'), t('booking.slot_expired'));
+      setSelectedSlot(null);
+      return;
+    }
     setConfirming(true);
     try {
-      const appointmentId = await bookAppointment({
+      const { appointmentId, status } = await bookAppointment({
         patientId: user.uid,
         doctorId: doctor.id,
         doctorUserId: doctor.userId ?? null,
@@ -67,8 +112,8 @@ export default function BookingScreen() {
         timeSlot: selectedSlot,
         type: apptType,
         fee,
-        // Doctors confirm bookings from their portal.
-        status: 'pending',
+        // status is decided inside bookAppointment from the doctor's autoConfirm
+        // setting, read transactionally — the client's copy may be stale.
         chatSummary: attachSymptoms && triageResult ? triageResult.recommendation : null,
         possibleConditions: attachSymptoms && triageResult ? triageResult.conditions : null,
         severity: attachSymptoms && triageResult ? triageResult.severity : null,
@@ -77,14 +122,20 @@ export default function BookingScreen() {
       });
       // Best-effort local reminder 1h before the visit (no-op on web).
       scheduleAppointmentReminder(appointmentId, selectedDate, selectedSlot, doctor.nameEn);
+      setBookedStatus(status);
       setConfirmed(true);
     } catch (e: any) {
+      // The live slot and doctor subscriptions refresh availability automatically.
       if (e.message === 'SLOT_TAKEN') {
-        // The slot subscription refreshes availability automatically.
-        showAlert('Slot unavailable', t('booking.slot_taken'));
+        showAlert(t('common.error'), t('booking.slot_taken'));
         setSelectedSlot(null);
+      } else if (e.message === 'DAY_FULL') {
+        showAlert(t('common.error'), t('booking.day_full'));
+        setSelectedSlot(null);
+      } else if (e.message === 'DOCTOR_UNAVAILABLE' || e.message === 'DOCTOR_NOT_FOUND') {
+        showAlert(t('common.error'), t('booking.doctor_unavailable'));
       } else {
-        showAlert('Error', 'Could not confirm booking. Please try again.');
+        showAlert(t('common.error'), t('booking.booking_failed'));
       }
     } finally {
       setConfirming(false);
@@ -99,11 +150,19 @@ export default function BookingScreen() {
     return (
       <SafeAreaView className="flex-1 bg-white px-6">
         <View className="flex-1 items-center justify-center gap-5 w-full md:max-w-md md:self-center">
-          <View className="w-24 h-24 rounded-full bg-green-100 items-center justify-center">
-            <Ionicons name="checkmark" size={52} color="#16A34A" />
+          <View className={`w-24 h-24 rounded-full items-center justify-center ${bookedStatus === 'confirmed' ? 'bg-green-100' : 'bg-amber-100'}`}>
+            <Ionicons
+              name={bookedStatus === 'confirmed' ? 'checkmark' : 'time-outline'}
+              size={52}
+              color={bookedStatus === 'confirmed' ? '#16A34A' : '#D97706'}
+            />
           </View>
-          <Text className="text-2xl font-bold text-slate-800 text-center">{t('booking.booking_confirmed')}</Text>
-          <Text className="text-slate-500 text-center -mt-2">{t('booking.reminder_note')}</Text>
+          <Text className="text-2xl font-bold text-slate-800 text-center">
+            {t(bookedStatus === 'confirmed' ? 'booking.booking_confirmed' : 'booking.booking_requested')}
+          </Text>
+          <Text className="text-slate-500 text-center -mt-2">
+            {t(bookedStatus === 'confirmed' ? 'booking.reminder_note' : 'booking.awaiting_confirmation')}
+          </Text>
           <Card className="w-full p-5 gap-4 mt-2">
             <View className="flex-row justify-between"><Text className="text-slate-500">{t('booking.summary_doctor')}</Text><Text className="font-semibold text-slate-800">{doctor.nameEn}</Text></View>
             <View className="flex-row justify-between"><Text className="text-slate-500">{t('booking.summary_specialty')}</Text><Text className="font-semibold text-slate-800">{doctor.specialty}</Text></View>
@@ -172,18 +231,30 @@ export default function BookingScreen() {
         <View className="gap-2">
           <Text className="font-semibold text-slate-700">{t('booking.select_date')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {availableDates.map((date) => (
-              <TouchableOpacity
-                key={date}
-                onPress={() => setSelectedDate(date)}
-                className={`mr-2 px-3 py-2 rounded-xl border ${selectedDate === date ? 'bg-primary-500 border-primary-500' : 'bg-white border-slate-200'}`}
-              >
-                <Text className={`text-xs font-medium ${selectedDate === date ? 'text-white' : 'text-slate-600'}`}>
-                  {formatAppointmentDate(date)}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {availableDates.map((date) => {
+              const left = openByDate[date]?.length ?? 0;
+              const full = left === 0;
+              const active = selectedDate === date;
+              return (
+                <TouchableOpacity
+                  key={date}
+                  disabled={full}
+                  onPress={() => setSelectedDate(date)}
+                  className={`mr-2 px-3 py-2 rounded-xl border items-center ${full ? 'bg-slate-100 border-slate-200' : active ? 'bg-primary-500 border-primary-500' : 'bg-white border-slate-200'}`}
+                >
+                  <Text className={`text-xs font-medium ${full ? 'text-slate-400' : active ? 'text-white' : 'text-slate-600'}`}>
+                    {formatAppointmentDate(date)}
+                  </Text>
+                  <Text className={`text-[10px] mt-0.5 ${full ? 'text-slate-400' : active ? 'text-white/80' : 'text-slate-400'}`}>
+                    {full ? t('booking.full') : t('booking.slots_left', { count: left })}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
+          {availableDates.length === 0 && (
+            <Text className="text-slate-400 text-sm">{t('booking.no_dates_available')}</Text>
+          )}
         </View>
 
         {/* Time slots */}
@@ -191,20 +262,29 @@ export default function BookingScreen() {
           <View className="gap-2">
             <Text className="font-semibold text-slate-700">{t('booking.select_time')}</Text>
             <View className="flex-row flex-wrap gap-2">
-              {doctor.timeSlots.map((slot) => {
+              {slotsForDate(doctor, selectedDate).map((slot) => {
+                // Unavailable either because someone booked it or because it has
+                // already passed today — both render the same, disabled.
                 const taken = bookedSlots.includes(slot);
+                const disabled = !openSlots.includes(slot);
                 return (
                   <TouchableOpacity
                     key={slot}
-                    disabled={taken}
+                    disabled={disabled}
                     onPress={() => setSelectedSlot(slot)}
-                    className={`px-4 py-2 rounded-xl border ${taken ? 'bg-slate-100 border-slate-200 opacity-50' : selectedSlot === slot ? 'bg-primary-500 border-primary-500' : 'bg-white border-slate-200'}`}
+                    className={`px-4 py-2 rounded-xl border ${disabled ? 'bg-slate-100 border-slate-200 opacity-50' : selectedSlot === slot ? 'bg-primary-500 border-primary-500' : 'bg-white border-slate-200'}`}
                   >
-                    <Text className={`text-sm font-medium ${taken ? 'text-slate-400' : selectedSlot === slot ? 'text-white' : 'text-slate-700'}`}>{slot}</Text>
+                    <Text className={`text-sm font-medium ${disabled ? 'text-slate-400' : selectedSlot === slot ? 'text-white' : 'text-slate-700'}`}>
+                      {slot}
+                    </Text>
+                    {taken && <Text className="text-[10px] text-slate-400 text-center">{t('booking.taken')}</Text>}
                   </TouchableOpacity>
                 );
               })}
             </View>
+            {openSlots.length === 0 && (
+              <Text className="text-slate-400 text-sm">{t('booking.no_slots_left')}</Text>
+            )}
           </View>
         )}
 

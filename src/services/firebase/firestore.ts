@@ -25,6 +25,12 @@ import type { Appointment, AppointmentStatus } from '../../types/appointment';
 import type { MedicalRecord } from '../../types/record';
 import type { MedicineReminder } from '../../types/medicine';
 import type { Prescription } from '../../types/prescription';
+import {
+  readCapacity,
+  effectiveLimit,
+  slotsForLimit,
+  pruneOverrides,
+} from '../../utils/capacity';
 
 // ── Doctors ──────────────────────────────────────────────────────────────────
 
@@ -70,6 +76,46 @@ export async function getDoctor(id: string): Promise<Doctor | null> {
   return { id: snap.id, ...snap.data() } as Doctor;
 }
 
+/**
+ * Live doctor doc. The booking screen and the doctor portal both need capacity
+ * changes to land without a reload — a one-shot read would leave a patient
+ * booking against a limit the doctor has already lowered.
+ */
+export function subscribeDoctor(
+  id: string,
+  onData: (doctor: Doctor | null) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, 'doctors', id),
+    (snap) => onData(snap.exists() ? ({ id: snap.id, ...snap.data() } as Doctor) : null),
+    (err) => onError?.(err),
+  );
+}
+
+/**
+ * Sets or clears the patient cap for a single date.
+ * The doctor is the only writer, so the whole map is replaced (pruned of days
+ * that are over) rather than patched field-by-field.
+ */
+export async function setDayLimit(
+  doctorId: string,
+  overrides: Record<string, number>,
+  date: string,
+  limit: number | null,
+): Promise<void> {
+  const next = pruneOverrides(overrides);
+  if (limit === null) {
+    delete next[date];
+  } else {
+    next[date] = limit;
+  }
+  await updateDoc(doc(db, 'doctors', doctorId), {
+    dailyLimitOverrides: next,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function updateDoctorAvailability(
   doctorId: string,
   isAvailable: boolean,
@@ -97,6 +143,11 @@ export type EditableDoctorProfile = Partial<
     | 'availableDays'
     | 'timeSlots'
     | 'bio'
+    | 'autoConfirm'
+    | 'chamberStart'
+    | 'slotDurationMins'
+    | 'dailyPatientLimit'
+    | 'dailyLimitOverrides'
   >
 >;
 
@@ -166,21 +217,55 @@ function slotDocId(date: string, timeSlot: string): string {
   return `${date}_${timeSlot}`;
 }
 
+/**
+ * Books a slot and decides the appointment's status.
+ *
+ * `status` is derived here from the transactionally-read doctor doc rather than
+ * accepted from the caller: the client's copy of the doctor can be arbitrarily
+ * stale, and only the transaction's read is authoritative about whether that
+ * doctor has auto-confirm switched on.
+ */
 export async function bookAppointment(
-  data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>,
-): Promise<string> {
+  data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt' | 'status'>,
+): Promise<{ appointmentId: string; status: AppointmentStatus }> {
+  const doctorRef = doc(db, 'doctors', data.doctorId);
   const slotRef = doc(db, 'doctors', data.doctorId, 'slots', slotDocId(data.date, data.timeSlot));
   const appointmentRef = doc(collection(db, 'appointments'));
+  let status: AppointmentStatus = 'pending';
 
   // tx.get on the slot doc is a true transactional read (queries inside
   // runTransaction are not), so two concurrent bookings of the same slot
-  // cannot both commit.
+  // cannot both commit. Firestore requires every read before every write.
+  //
+  // Reading the doctor doc puts it in the transaction's read set, so a concurrent
+  // write to it (rating aggregation, availability toggle, a capacity save) aborts
+  // and retries this booking. That is the behaviour we want — the retry re-reads
+  // the fresh limit — and the SDK retries automatically.
   await runTransaction(db, async (tx) => {
+    const doctorSnap = await tx.get(doctorRef);
     const existing = await tx.get(slotRef);
+
+    if (!doctorSnap.exists()) throw new Error('DOCTOR_NOT_FOUND');
+    const raw = doctorSnap.data() as Doctor;
+    if (raw.isAvailable === false) throw new Error('DOCTOR_UNAVAILABLE');
+
+    // Capacity is enforced as an INDEX check, not a count: a transaction cannot
+    // run queries, so it cannot count the day's bookings. Because slots are
+    // generated in a fixed order, "is this slot within the first N?" gives
+    // exactly the semantics we want — lowering the limit blocks new bookings at
+    // indexes past it while leaving already-booked ones untouched.
+    const cap = readCapacity(raw);
+    const limit = effectiveLimit(cap, data.date);
+    if (!slotsForLimit(cap, raw.timeSlots ?? [], limit).includes(data.timeSlot)) {
+      throw new Error('DAY_FULL');
+    }
     if (existing.exists()) throw new Error('SLOT_TAKEN');
+
+    status = cap.autoConfirm ? 'confirmed' : 'pending';
 
     tx.set(appointmentRef, {
       ...data,
+      status,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -204,7 +289,7 @@ export async function bookAppointment(
     }
   });
 
-  return appointmentRef.id;
+  return { appointmentId: appointmentRef.id, status };
 }
 
 export async function getAppointment(id: string): Promise<Appointment | null> {
@@ -269,14 +354,50 @@ export async function getBookedSlots(doctorId: string, date: string): Promise<st
   return snap.docs.map((d) => d.data().timeSlot as string);
 }
 
+/**
+ * Booked slots across a date range, grouped by date. One listener covers the
+ * whole booking strip, so a fully-booked day can be marked without a query per
+ * date — and switching dates no longer briefly shows the previous date's
+ * bookings. A single-field range on `date` needs no composite index.
+ */
+export function subscribeBookedSlotsRange(
+  doctorId: string,
+  fromDate: string,
+  toDate: string,
+  onData: (byDate: Record<string, string[]>) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    query(
+      collection(db, 'doctors', doctorId, 'slots'),
+      where('date', '>=', fromDate),
+      where('date', '<=', toDate),
+      limit(500),
+    ),
+    (snap) => {
+      const byDate: Record<string, string[]> = {};
+      snap.docs.forEach((d) => {
+        const { date, timeSlot } = d.data() as { date: string; timeSlot: string };
+        (byDate[date] ??= []).push(timeSlot);
+      });
+      onData(byDate);
+    },
+    (err) => onError?.(err),
+  );
+}
+
 export function subscribeBookedSlots(
   doctorId: string,
   date: string,
   onData: (slots: string[]) => void,
+  onError?: (error: Error) => void,
 ): Unsubscribe {
   return onSnapshot(
     query(collection(db, 'doctors', doctorId, 'slots'), where('date', '==', date)),
     (snap) => onData(snap.docs.map((d) => d.data().timeSlot as string)),
+    // Without this a rules regression renders as "every slot free", and every
+    // booking then fails late with SLOT_TAKEN.
+    (err) => onError?.(err),
   );
 }
 

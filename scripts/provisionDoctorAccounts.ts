@@ -4,8 +4,15 @@
  *
  * Idempotent: re-running updates links without duplicating accounts.
  *
+ * Doubles as the password-rotation path — re-running resets every existing
+ * doctor account to the current DOCTOR_SEED_PASSWORD. All 18 doctors share one
+ * password, so rotating means every doctor login changes at once.
+ *
  * Usage (PowerShell):
  *   $env:DOCTOR_SEED_PASSWORD = "choose-a-strong-password"; npm run provision-doctors
+ *
+ * Or put DOCTOR_SEED_PASSWORD in .env.local (gitignored) and just run
+ * `npm run provision-doctors`.
  */
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
@@ -46,11 +53,18 @@ async function provision() {
     const doctor = docSnap.data();
     const email = `${doctorId}@medimatch.app`;
 
+    // Only the lookup may fail here — keeping createUser out of the catch so a
+    // failing password update can never be mistaken for "account missing".
+    const existing = await auth.getUserByEmail(email).catch(() => null);
+
     let uid: string;
-    try {
-      const existing = await auth.getUserByEmail(email);
+    if (existing) {
       uid = existing.uid;
-    } catch {
+      // Re-apply the password so this script doubles as the rotation path.
+      // Without it an existing account keeps its old password forever and a
+      // changed DOCTOR_SEED_PASSWORD would silently have no effect.
+      await auth.updateUser(uid, { password });
+    } else {
       const created = await auth.createUser({
         email,
         password,

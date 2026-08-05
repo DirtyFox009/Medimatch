@@ -2,6 +2,21 @@ export type UserRole = 'patient' | 'doctor';
 
 export type Gender = 'male' | 'female' | 'other';
 
+/**
+ * One doctor's permission to read this patient's profile and medical records,
+ * stored at users/{patientId}/authorizedDoctors/{doctorUserId}. Written by the
+ * patient at booking time; the Firestore rules authorise reads against it.
+ */
+export interface RecordGrant {
+  /** Auth uid of the doctor — also the document id. */
+  doctorUserId: string;
+  /** doctors/{doctorId} document id, for resolving the doctor's name. */
+  doctorId: string;
+  grantedAt: Date | null;
+  /** Access lapses here; the rules reject the read past this instant. */
+  expiresAt: Date | null;
+}
+
 export interface AppUser {
   uid: string;
   displayName: string;

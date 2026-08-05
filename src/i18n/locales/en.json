@@ -76,7 +76,15 @@
     "division": "Division",
     "years": "yrs",
     "incomplete": "Add your date of birth and gender so your doctor's prescription is filled in correctly.",
-    "shared_with_doctor": "Your name, age and gender appear on prescriptions written by doctors you book."
+    "shared_with_doctor": "Your name, age and gender appear on prescriptions written by doctors you book.",
+    "record_access": "Doctors with access to my records",
+    "record_access_hint": "Booking a doctor lets them read your medical records. Access ends automatically 90 days after your last appointment with them.",
+    "no_doctor_access": "No doctor can currently read your records",
+    "access_until": "Access until {{date}}",
+    "this_doctor": "This doctor",
+    "revoke": "Revoke",
+    "revoke_access": "Revoke access",
+    "revoke_confirm": "{{name}} will no longer be able to read your medical records. Booking them again will restore access."
   },
   "home": {
     "greeting": "Hello, {{name}}",

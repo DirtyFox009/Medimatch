@@ -11,6 +11,7 @@ import { DateField } from '../../src/components/ui/DateField';
 import { GenderChips } from '../../src/components/ui/GenderChips';
 import { SelectField } from '../../src/components/ui/SelectField';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
+import { RecordAccessCard } from '../../src/components/profile/RecordAccessCard';
 import { updateUserProfile } from '../../src/services/firebase/auth';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useAuthStore } from '../../src/store/authStore';
@@ -175,6 +176,8 @@ export default function PatientProfileScreen() {
               <Button title={t('profile.edit')} variant="secondary" onPress={startEditing} fullWidth />
             </Card>
           )}
+
+          <RecordAccessCard patientId={appUser.uid} />
         </ScrollView>
       </ResponsiveContainer>
     </SafeAreaView>

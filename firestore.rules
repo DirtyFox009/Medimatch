@@ -5,14 +5,24 @@ service cloud.firestore {
     function authed() { return request.auth != null; }
     function isOwner(uid) { return authed() && request.auth.uid == uid; }
 
+    // A doctor may read a patient's profile and records only while an unexpired
+    // grant exists. Existence alone is not enough: it used to mean that a single
+    // cancelled booking granted a doctor access forever. A grant carrying no
+    // expiresAt is treated as expired, so anything unstamped fails closed.
+    function grantActive(uid) {
+      return authed()
+        && exists(/databases/$(database)/documents/users/$(uid)/authorizedDoctors/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(uid)/authorizedDoctors/$(request.auth.uid))
+             .data.get('expiresAt', request.time) > request.time;
+    }
+
     // ── User profiles ────────────────────────────────────────────────────
     match /users/{uid} {
       // The owner reads their own profile; a doctor the patient has booked may
       // also read it (the Rx screen prefills the patient's name). Authorized by
       // the same grant doc as records — never a blanket doctor-role read, which
       // would expose every user profile to every doctor account.
-      allow read: if isOwner(uid)
-        || exists(/databases/$(database)/documents/users/$(uid)/authorizedDoctors/$(request.auth.uid));
+      allow read: if isOwner(uid) || grantActive(uid);
       // Self-signup may only create a patient profile; doctor accounts are
       // provisioned by the admin script (scripts/provisionDoctorAccounts.ts).
       allow create: if isOwner(uid)
@@ -28,15 +38,24 @@ service cloud.firestore {
         // The owner reads/writes freely; a doctor the patient has booked may
         // READ (never write) — authorized by the grant doc below, since rules
         // can only get/exists a known path, not query the appointments list.
-        allow read: if isOwner(uid)
-          || exists(/databases/$(database)/documents/users/$(uid)/authorizedDoctors/$(request.auth.uid));
+        allow read: if isOwner(uid) || grantActive(uid);
         allow write: if isOwner(uid);
       }
       // Read-grant ledger: one doc per doctor the patient has booked. Written by
       // the patient (owner) at booking time; the named doctor may read it.
       match /authorizedDoctors/{doctorUid} {
         allow read: if isOwner(uid) || request.auth.uid == doctorUid;
-        allow write: if isOwner(uid);
+        // Only the patient may grant or extend access. Deliberately NOT requiring
+        // expiresAt here: this write happens inside the booking transaction, so
+        // rejecting an unstamped grant would fail the whole booking for any client
+        // running code older than the expiry change. A grant without a usable
+        // expiresAt is already powerless — grantActive() above denies it — so the
+        // read rule is what enforces this, and it fails closed on its own.
+        allow create, update: if isOwner(uid);
+        // Either side may revoke. A doctor cancelling an appointment has no write
+        // access here, and must not — that would let them extend their own window
+        // — but dropping their own access is always safe.
+        allow delete: if isOwner(uid) || request.auth.uid == doctorUid;
       }
       match /medicines/{medicineId} {
         allow read, write: if isOwner(uid);

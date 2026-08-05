@@ -59,6 +59,7 @@
     "restore": "ts-node --project tsconfig.seed.json scripts/restoreProject.ts",
     "deploy:rules": "ts-node --project tsconfig.seed.json scripts/deployRules.ts",
     "backfill-grants": "ts-node --project tsconfig.seed.json scripts/backfillRecordGrants.ts",
+    "backfill-grant-expiry": "ts-node --project tsconfig.seed.json scripts/backfillGrantExpiry.ts",
     "test:e2e": "playwright test"
   },
   "private": true

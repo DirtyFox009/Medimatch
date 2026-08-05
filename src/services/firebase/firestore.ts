@@ -15,11 +15,12 @@ import {
   runTransaction,
   writeBatch,
   serverTimestamp,
+  Timestamp,
   type QueryConstraint,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { db } from './config';
+import { db, auth } from './config';
 import type { Doctor, DoctorFilter, Review } from '../../types/doctor';
 import type { Appointment, AppointmentStatus } from '../../types/appointment';
 import type { MedicalRecord } from '../../types/record';
@@ -31,6 +32,16 @@ import {
   slotsForLimit,
   pruneOverrides,
 } from '../../utils/capacity';
+import { accessExpiryFor, expiryFromAppointments } from '../../utils/recordAccess';
+import type { RecordGrant } from '../../types/user';
+
+/** Firestore Timestamp | Date | null → Date | null. */
+function toDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Timestamp) return value.toDate();
+  if (value instanceof Date) return value;
+  return null;
+}
 
 // ── Doctors ──────────────────────────────────────────────────────────────────
 
@@ -241,9 +252,14 @@ export async function bookAppointment(
   // write to it (rating aggregation, availability toggle, a capacity save) aborts
   // and retries this booking. That is the behaviour we want — the retry re-reads
   // the fresh limit — and the SDK retries automatically.
+  const grantRef = data.doctorUserId
+    ? doc(db, 'users', data.patientId, 'authorizedDoctors', data.doctorUserId)
+    : null;
+
   await runTransaction(db, async (tx) => {
     const doctorSnap = await tx.get(doctorRef);
     const existing = await tx.get(slotRef);
+    const grantSnap = grantRef ? await tx.get(grantRef) : null;
 
     if (!doctorSnap.exists()) throw new Error('DOCTOR_NOT_FOUND');
     const raw = doctorSnap.data() as Doctor;
@@ -278,13 +294,26 @@ export async function bookAppointment(
 
     // Grant the booked doctor read access to this patient's medical records.
     // Written by the patient (record owner) so the rules allow it; the doctor's
-    // records read is authorized against the existence of this deterministic
-    // doc (Firestore rules cannot query, only get/exists a known path).
+    // records read is authorized against this deterministic doc (Firestore rules
+    // cannot query, only get/exists a known path).
+    //
+    // The grant expires, and the rules enforce that — existence alone used to
+    // mean a single cancelled booking granted access forever. Rebooking extends
+    // it, but never shortens it: booking a nearer date after a farther one must
+    // not pull the expiry back in.
     if (data.doctorUserId) {
+      const existingExpiry = grantSnap?.exists()
+        ? toDate(grantSnap.data().expiresAt)
+        : null;
+      const earned = accessExpiryFor(data.date);
+      const expiresAt =
+        existingExpiry && existingExpiry.getTime() > earned.getTime() ? existingExpiry : earned;
+
       tx.set(doc(db, 'users', data.patientId, 'authorizedDoctors', data.doctorUserId), {
         doctorUserId: data.doctorUserId,
         doctorId: data.doctorId,
         grantedAt: serverTimestamp(),
+        expiresAt: Timestamp.fromDate(expiresAt),
       });
     }
   });
@@ -422,6 +451,87 @@ export async function cancelAppointment(appointment: Appointment): Promise<void>
   if (slotSnap.exists()) batch.delete(slotRef);
 
   await batch.commit();
+
+  // Cancelling may have removed the last thing justifying this doctor's access
+  // to the patient's records. Best-effort: the grant carries an expiry the rules
+  // enforce regardless, so a failure here delays revocation rather than losing it.
+  await revokeAccessIfUnjustified(appointment).catch((e) =>
+    console.warn('[cancelAppointment] grant revocation skipped:', e),
+  );
+}
+
+/**
+ * Drops the record-access grant when no remaining appointment justifies it.
+ *
+ * Called after a cancellation by either side. A patient may rewrite the grant
+ * (narrowing its expiry to what is still justified); a doctor may only delete
+ * their own — letting a doctor rewrite it would let them extend their own access.
+ */
+async function revokeAccessIfUnjustified(appointment: Appointment): Promise<void> {
+  const { patientId, doctorUserId } = appointment;
+  if (!doctorUserId) return;
+
+  // Both roles can read their own side of this: patients query by patientId,
+  // doctors by doctorUserId. Filter the other key client-side.
+  const currentUid = auth.currentUser?.uid;
+  if (!currentUid) return;
+  const isPatient = currentUid === patientId;
+
+  const snap = await getDocs(
+    query(
+      collection(db, 'appointments'),
+      where(isPatient ? 'patientId' : 'doctorUserId', '==', isPatient ? patientId : doctorUserId),
+      limit(100),
+    ),
+  );
+  const between = snap.docs
+    .map((d) => d.data() as Appointment)
+    .filter((a) => a.patientId === patientId && a.doctorUserId === doctorUserId);
+
+  const expiry = expiryFromAppointments(between);
+  const grantRef = doc(db, 'users', patientId, 'authorizedDoctors', doctorUserId);
+
+  if (expiry === null) {
+    // Every appointment between them is cancelled — no basis for access at all.
+    await deleteDoc(grantRef);
+    return;
+  }
+  // Something still justifies access; only the patient may narrow the window.
+  if (isPatient) {
+    await updateDoc(grantRef, { expiresAt: Timestamp.fromDate(expiry) });
+  }
+}
+
+/** Doctors currently able to read this patient's records. */
+export function subscribeRecordGrants(
+  patientId: string,
+  onData: (grants: RecordGrant[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    collection(db, 'users', patientId, 'authorizedDoctors'),
+    (snap) =>
+      onData(
+        snap.docs.map((d) => {
+          const v = d.data();
+          return {
+            doctorUserId: d.id,
+            doctorId: v.doctorId ?? '',
+            grantedAt: toDate(v.grantedAt),
+            expiresAt: toDate(v.expiresAt),
+          };
+        }),
+      ),
+    (err) => onError?.(err),
+  );
+}
+
+/** Patient-initiated revocation — removes a doctor's access immediately. */
+export async function revokeRecordAccess(
+  patientId: string,
+  doctorUserId: string,
+): Promise<void> {
+  await deleteDoc(doc(db, 'users', patientId, 'authorizedDoctors', doctorUserId));
 }
 
 /** Doctor-side status transitions (confirm / complete). Cancel goes through cancelAppointment. */

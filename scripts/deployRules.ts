@@ -44,6 +44,13 @@ async function deployOne(ruleFile: string, releaseId: string): Promise<void> {
   console.log(`  uploaded ruleset for ${ruleFile}: ${rulesetName}`);
 
   // 2. Point the release at the new ruleset (create, or update if it exists).
+  //
+  // The release almost always already exists, so PATCH is the normal path. POST
+  // is tried first only to cover a brand-new project. A 409 means it exists; a
+  // 403 means this service account lacks firebaserules.releases.create — which
+  // the firebase-adminsdk account does. Both fall through to PATCH, which needs
+  // only firebaserules.releases.update, and that it does have. Treating 403 as
+  // fatal is what made this script look like it needed a broader IAM role.
   const releaseName = `projects/${PROJECT_ID}/releases/${releaseId}`;
   try {
     await client.request({
@@ -53,16 +60,14 @@ async function deployOne(ruleFile: string, releaseId: string): Promise<void> {
     });
     console.log(`  created release ${releaseId}`);
   } catch (err: any) {
-    if (err?.response?.status === 409) {
-      await client.request({
-        url: `${BASE}/${encodeURI(releaseName)}`,
-        method: 'PATCH',
-        data: { release: { name: releaseName, rulesetName } },
-      });
-      console.log(`  updated release ${releaseId}`);
-    } else {
-      throw err;
-    }
+    const status = err?.response?.status;
+    if (status !== 409 && status !== 403) throw err;
+    await client.request({
+      url: `${BASE}/${encodeURI(releaseName)}`,
+      method: 'PATCH',
+      data: { release: { name: releaseName, rulesetName } },
+    });
+    console.log(`  updated release ${releaseId}`);
   }
 }
 

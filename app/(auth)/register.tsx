@@ -6,11 +6,18 @@ import { useForm, Controller } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
 import { Input } from '../../src/components/ui/Input';
 import { Button } from '../../src/components/ui/Button';
+import { DateField } from '../../src/components/ui/DateField';
+import { GenderChips } from '../../src/components/ui/GenderChips';
 import { signUp } from '../../src/services/firebase/auth';
 import { showAlert } from '../../src/utils/alert';
+import { ageFromDob } from '../../src/utils/formatDate';
+import type { Gender } from '../../src/types/user';
 
 interface RegisterForm {
   displayName: string;
+  /** ISO YYYY-MM-DD — the account stores the birth date, and age is derived from it. */
+  dateOfBirth: string;
+  gender: Gender | '';
   email: string;
   password: string;
   confirmPassword: string;
@@ -23,9 +30,11 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
 
   const { control, handleSubmit, watch, formState: { errors } } = useForm<RegisterForm>({
-    defaultValues: { privacyAccepted: false },
+    defaultValues: { privacyAccepted: false, dateOfBirth: '', gender: '' },
   });
   const password = watch('password');
+  // Nobody was born tomorrow — caps the web date picker.
+  const today = new Date().toISOString().slice(0, 10);
 
   const onSubmit = async (data: RegisterForm) => {
     if (!data.privacyAccepted) {
@@ -34,7 +43,11 @@ export default function RegisterScreen() {
     }
     setLoading(true);
     try {
-      await signUp(data.email, data.password, data.displayName);
+      await signUp(data.email, data.password, {
+        displayName: data.displayName,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender as Gender,
+      });
     } catch (e: any) {
       const code = e.code ? `[${e.code}]` : '';
       showAlert('Registration failed', `${code} ${e.message ?? 'Could not create account'}`.trim());
@@ -63,6 +76,40 @@ export default function RegisterScreen() {
             rules={{ required: 'Full name is required' }}
             render={({ field: { onChange, value, ref } }) => (
               <Input ref={ref} label={t('auth.full_name')} placeholder="Rahim Uddin" value={value} onChangeText={onChange} error={errors.displayName?.message} />
+            )}
+          />
+
+          {/* Date of birth, not age: the doctor's prescription derives the current
+              age from it, so it stays correct for the life of the account. */}
+          <Controller
+            control={control}
+            name="dateOfBirth"
+            rules={{
+              required: t('auth.dob_required'),
+              validate: (v) => ageFromDob(v) !== null || t('auth.dob_invalid'),
+            }}
+            render={({ field: { onChange, value } }) => (
+              <DateField
+                label={t('auth.date_of_birth')}
+                value={value}
+                onChange={onChange}
+                max={today}
+                error={errors.dateOfBirth?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="gender"
+            rules={{ required: t('auth.gender_required') }}
+            render={({ field: { onChange, value } }) => (
+              <GenderChips
+                label={t('auth.gender')}
+                value={value}
+                onChange={onChange}
+                error={errors.gender?.message}
+              />
             )}
           />
 

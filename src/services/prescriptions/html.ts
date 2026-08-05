@@ -35,10 +35,14 @@ export function buildPrescriptionHtml(p: Prescription): string {
     )
     .join('');
 
+  // The printed sheet is English-only by design (BMDC convention), so these
+  // labels stay hardcoded — but the gender must print as a word, not the raw enum.
+  const SEX_LABEL: Record<string, string> = { male: 'Male', female: 'Female', other: 'Other' };
+
   const patientBits = [
     p.patientName && `<b>${esc(p.patientName)}</b>`,
-    p.patientAge && `Age: ${esc(p.patientAge)}`,
-    p.patientGender && `Sex: ${esc(p.patientGender)}`,
+    p.patientAge && `Age: ${esc(p.patientAge)} yrs`,
+    p.patientGender && `Sex: ${esc(SEX_LABEL[p.patientGender] ?? p.patientGender)}`,
     p.patientWeight && `Wt: ${esc(p.patientWeight)} kg`,
   ]
     .filter(Boolean)

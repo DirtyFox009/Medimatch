@@ -65,6 +65,7 @@ export default function TabsLayout() {
     { key: 'doctors', label: t('nav.doctors'), icon: 'people', route: '/(tabs)/doctors' },
     { key: 'appointments', label: t('nav.appointments'), icon: 'calendar', route: '/(tabs)/appointments' },
     { key: 'records', label: t('nav.records'), icon: 'folder', route: '/(tabs)/records' },
+    { key: 'profile', label: t('nav.profile'), icon: 'person', route: '/(tabs)/profile' },
   ];
 
   const tabs = (
@@ -120,6 +121,13 @@ export default function TabsLayout() {
         options={{
           title: t('nav.records'),
           tabBarIcon: ({ color, size }) => <Ionicons name="folder" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: t('nav.profile'),
+          tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
         }}
       />
     </Tabs>

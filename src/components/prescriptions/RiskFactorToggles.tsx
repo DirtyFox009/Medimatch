@@ -6,6 +6,8 @@ import type { PatientRiskFlags } from '../../types/prescription';
 interface RiskFactorTogglesProps {
   flags: PatientRiskFlags;
   onChange: (flags: PatientRiskFlags) => void;
+  /** Set for a male patient — the chip is meaningless and mis-gates the engine. */
+  hidePregnancy?: boolean;
 }
 
 const RISK_KEYS: { flag: keyof PatientRiskFlags; i18nKey: string }[] = [
@@ -21,11 +23,12 @@ const RISK_KEYS: { flag: keyof PatientRiskFlags; i18nKey: string }[] = [
   { flag: 'heartDisease', i18nKey: 'risk_heart_disease' },
 ];
 
-export function RiskFactorToggles({ flags, onChange }: RiskFactorTogglesProps) {
+export function RiskFactorToggles({ flags, onChange, hidePregnancy }: RiskFactorTogglesProps) {
   const { t } = useTranslation();
+  const keys = hidePregnancy ? RISK_KEYS.filter((k) => k.flag !== 'pregnancy') : RISK_KEYS;
   return (
     <View className="flex-row flex-wrap gap-2">
-      {RISK_KEYS.map(({ flag, i18nKey }) => {
+      {keys.map(({ flag, i18nKey }) => {
         const active = flags[flag];
         return (
           <TouchableOpacity

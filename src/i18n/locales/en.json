@@ -29,7 +29,8 @@
     "chat": "Symptoms",
     "doctors": "Doctors",
     "appointments": "Appointments",
-    "records": "Records"
+    "records": "Records",
+    "profile": "Profile"
   },
   "auth": {
     "login": "Log In",
@@ -57,7 +58,23 @@
     "verify_email_banner": "Please verify your email address — check your inbox for the link.",
     "resend": "Resend",
     "verification_sent": "Sent ✓",
-    "emergency_link": "Emergency — find nearby hospitals"
+    "emergency_link": "Emergency — find nearby hospitals",
+    "date_of_birth": "Date of birth",
+    "gender": "Gender",
+    "dob_required": "Date of birth is required",
+    "dob_invalid": "Enter a valid date of birth",
+    "gender_required": "Please select your gender"
+  },
+  "profile": {
+    "title": "Profile",
+    "personal_info": "Personal information",
+    "edit": "Edit profile",
+    "updated": "Profile updated",
+    "phone": "Phone",
+    "division": "Division",
+    "years": "yrs",
+    "incomplete": "Add your date of birth and gender so your doctor's prescription is filled in correctly.",
+    "shared_with_doctor": "Your name, age and gender appear on prescriptions written by doctors you book."
   },
   "home": {
     "greeting": "Hello, {{name}}",

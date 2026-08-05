@@ -8,15 +8,24 @@ import {
   sendPasswordResetEmail,
   type User,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './config';
-import type { AppUser } from '../../types/user';
+import type { AppUser, Gender } from '../../types/user';
+
+/** Demographics collected on the registration form alongside the credentials. */
+export interface SignUpProfile {
+  displayName: string;
+  /** ISO YYYY-MM-DD. Stored instead of an age so it can never go stale. */
+  dateOfBirth: string;
+  gender: Gender;
+}
 
 export async function signUp(
   email: string,
   password: string,
-  displayName: string,
+  profile: SignUpProfile,
 ): Promise<User> {
+  const { displayName, dateOfBirth, gender } = profile;
   try {
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(user, { displayName });
@@ -24,6 +33,8 @@ export async function signUp(
       uid: user.uid,
       displayName,
       email,
+      dateOfBirth,
+      gender,
       phone: null,
       preferredLang: 'en',
       division: '',
@@ -72,7 +83,20 @@ export async function getUserProfile(uid: string): Promise<AppUser | null> {
     // Accounts created before roles existed are patients.
     role: data.role ?? 'patient',
     doctorId: data.doctorId ?? null,
+    // Accounts created before demographics were collected have neither; the
+    // patient can fill them in from the Profile tab.
+    dateOfBirth: data.dateOfBirth ?? null,
+    gender: data.gender ?? null,
   } as AppUser;
+}
+
+/** The profile fields a patient may edit themselves — never role or doctorId. */
+export type EditableProfile = Partial<
+  Pick<AppUser, 'displayName' | 'dateOfBirth' | 'gender' | 'phone' | 'division' | 'preferredLang'>
+>;
+
+export async function updateUserProfile(uid: string, patch: EditableProfile): Promise<void> {
+  await updateDoc(doc(db, 'users', uid), { ...patch, updatedAt: serverTimestamp() });
 }
 
 export function onAuthChange(callback: (user: User | null) => void) {

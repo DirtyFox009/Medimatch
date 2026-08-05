@@ -136,7 +136,7 @@ export default function PrescriptionDetailScreen() {
                 <View className="flex-row flex-wrap gap-2">
                   {!!prescription.patientAge && (
                     <Badge
-                      label={`${t('prescriptions.age')}: ${prescription.patientAge}`}
+                      label={`${t('prescriptions.age')}: ${prescription.patientAge} ${t('profile.years')}`}
                       color="blue"
                     />
                   )}

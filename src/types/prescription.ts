@@ -1,3 +1,5 @@
+import type { Gender } from './user';
+
 export interface PatientRiskFlags {
   pregnancy: boolean;
   renal: boolean;
@@ -11,7 +13,8 @@ export interface PatientRiskFlags {
   heartDisease: boolean;
 }
 
-export type PatientGender = 'male' | 'female' | 'other' | '';
+/** The account-level gender, plus '' for a prescription the doctor hasn't filled in. */
+export type PatientGender = Gender | '';
 
 export interface PrescriptionItem {
   medicineName: string;
@@ -32,8 +35,9 @@ export interface Prescription {
   patientId: string;
   doctorId: string;
   doctorUserId: string;
-  // Patient snapshot — typed by the doctor (appointments carry no patient
-  // profile, and doctors cannot read users/{uid}).
+  // Patient snapshot, frozen at issue time. Name/age/gender prefill from the
+  // patient's profile (users/{uid}, read via the authorizedDoctors grant); the
+  // doctor may override any of them before saving.
   patientName: string;
   patientAge: string;
   patientGender: PatientGender;

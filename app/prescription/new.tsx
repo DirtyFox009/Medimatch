@@ -8,6 +8,7 @@ import { Card } from '../../src/components/ui/Card';
 import { Button } from '../../src/components/ui/Button';
 import { Input } from '../../src/components/ui/Input';
 import { DateField } from '../../src/components/ui/DateField';
+import { GenderChips } from '../../src/components/ui/GenderChips';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import { RiskFactorToggles } from '../../src/components/prescriptions/RiskFactorToggles';
 import {
@@ -21,6 +22,7 @@ import {
 } from '../../src/components/prescriptions/MedicineTableRow';
 import { useAuth } from '../../src/hooks/useAuth';
 import { showAlert } from '../../src/utils/alert';
+import { ageFromDob } from '../../src/utils/formatDate';
 import {
   createPrescription,
   getAppointment,
@@ -50,8 +52,6 @@ const EMPTY_SUGGESTIONS: SuggestionResult = {
   emergencyFlags: [],
   warnings: [],
 };
-
-const GENDERS: PatientGender[] = ['male', 'female', 'other'];
 
 // Common "Sig" (timing) options for the instructions dropdown.
 const TIMING_OPTIONS = ['After meal', 'Before meal', 'Empty stomach', 'With food', 'Bedtime', 'As needed'];
@@ -124,12 +124,18 @@ export default function NewPrescriptionScreen() {
           } else if (appt.chatSummary) {
             setComplaint(appt.chatSummary);
           }
-          // Prefilling the name is a convenience, not a requirement — a denied
-          // profile read (rules not yet published) must not blank the whole form.
+          // Prefilling the patient details is a convenience, not a requirement —
+          // a denied profile read must not blank the whole form. Every field
+          // stays editable: legacy accounts carry no demographics, and a parent
+          // may be booking on behalf of a child.
           try {
             const patientProfile = await getUserProfile(appt.patientId);
-            if (active && patientProfile?.displayName) {
-              setPatientName(patientProfile.displayName);
+            if (active && patientProfile) {
+              if (patientProfile.displayName) setPatientName(patientProfile.displayName);
+              // Profiles store the birth date, so the age is always current.
+              const age = ageFromDob(patientProfile.dateOfBirth);
+              if (age !== null) setPatientAge(String(age));
+              if (patientProfile.gender) setPatientGender(patientProfile.gender);
             }
           } catch (e) {
             console.warn('[NewPrescription] patient profile lookup failed:', e);
@@ -147,12 +153,26 @@ export default function NewPrescriptionScreen() {
     };
   }, [appointmentId, user, appUser?.doctorId]);
 
-  // Elderly/pediatric flags follow the typed age.
+  // Elderly/pediatric flags follow the age (prefilled from the patient's date
+  // of birth, or typed). Clearing the age clears both — leaving a stale flag on
+  // would keep gating the contraindication engine on a number that is gone.
   useEffect(() => {
     const age = parseInt(patientAge, 10);
-    if (Number.isNaN(age)) return;
-    setRiskFlags((f) => ({ ...f, elderly: age >= 65, pediatric: age > 0 && age < 12 }));
+    const valid = !Number.isNaN(age);
+    setRiskFlags((f) => ({
+      ...f,
+      elderly: valid && age >= 65,
+      pediatric: valid && age > 0 && age < 12,
+    }));
   }, [patientAge]);
+
+  // Pregnancy cannot apply to a male patient; drop a flag left over from an
+  // earlier gender selection so it never reaches the engine or the document.
+  useEffect(() => {
+    if (patientGender === 'male') {
+      setRiskFlags((f) => (f.pregnancy ? { ...f, pregnancy: false } : f));
+    }
+  }, [patientGender]);
 
   // Debounced clinical suggestions (pure sync engine; debounce avoids churn).
   useEffect(() => {
@@ -354,32 +374,22 @@ export default function NewPrescriptionScreen() {
                 />
               </View>
             </View>
-            <View className="gap-1">
-              <Text className="text-sm font-medium text-slate-700">{t('prescriptions.gender')}</Text>
-              <View className="flex-row gap-2">
-                {GENDERS.map((g) => (
-                  <TouchableOpacity
-                    key={g}
-                    onPress={() => setPatientGender(g)}
-                    className={`px-3 py-1.5 rounded-full border ${
-                      patientGender === g ? 'bg-teal-600 border-teal-600' : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs font-medium ${patientGender === g ? 'text-white' : 'text-slate-600'}`}
-                    >
-                      {t(`prescriptions.gender_${g}`)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+            <GenderChips
+              label={t('prescriptions.gender')}
+              value={patientGender}
+              onChange={setPatientGender}
+              accent="teal"
+            />
           </Card>
 
           {/* Risk factors */}
           <Card className="p-4 gap-3">
             <Text className="font-bold text-slate-800">{t('prescriptions.risk_factors')}</Text>
-            <RiskFactorToggles flags={riskFlags} onChange={setRiskFlags} />
+            <RiskFactorToggles
+              flags={riskFlags}
+              onChange={setRiskFlags}
+              hidePregnancy={patientGender === 'male'}
+            />
           </Card>
 
           {/* Complaint & diagnosis */}

@@ -24,3 +24,15 @@ test('registration screen is reachable and asks for privacy consent', async ({ p
   await expect(page.getByText('Create your account')).toBeVisible();
   await expect(page.getByText(/Privacy Policy/).first()).toBeVisible();
 });
+
+test('registration collects date of birth and gender', async ({ page }) => {
+  await page.goto('/');
+  await page.getByText('Create Account').first().click();
+  // Demographics feed the doctor's prescription, so they must be on the form.
+  await expect(page.getByText('Date of birth')).toBeVisible();
+  await expect(page.locator('input[type="date"]')).toBeVisible();
+  await expect(page.getByText('Gender')).toBeVisible();
+  for (const label of ['Male', 'Female', 'Other']) {
+    await expect(page.getByText(label, { exact: true })).toBeVisible();
+  }
+});

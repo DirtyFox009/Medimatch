@@ -306,7 +306,8 @@
     "subtitle": "Medical records this patient has shared",
     "no_records": "This patient has no records yet",
     "tap_to_view": "Tap a record to open its file",
-    "cannot_open": "Could not open this file"
+    "cannot_open": "Could not open this file",
+    "open_new_tab": "Open in new tab"
   },
   "prescriptions": {
     "title": "Prescription",

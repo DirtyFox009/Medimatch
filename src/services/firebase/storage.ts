@@ -11,6 +11,36 @@ export class FileTooLargeError extends Error {
   }
 }
 
+/**
+ * Converts an inline `data:` URI into a `blob:` object URL.
+ *
+ * Browsers block top-level navigation to `data:` URIs (Chrome 60+, as an
+ * anti-phishing measure), so `window.open(dataUri)` returns null and an iframe
+ * pointed at one is refused. `blob:` URLs carry the same bytes and are allowed
+ * in both. `<img src="data:…">` is unaffected and needs no conversion.
+ *
+ * Caller owns the returned URL and must URL.revokeObjectURL() it.
+ */
+export function dataUriToBlobUrl(dataUri: string): string | null {
+  const match = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(dataUri);
+  if (!match) return null;
+  const [, mimeType, isBase64, payload] = match;
+  try {
+    let blob: Blob;
+    if (isBase64) {
+      const binary = atob(payload);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      blob = new Blob([bytes], { type: mimeType || 'application/octet-stream' });
+    } else {
+      blob = new Blob([decodeURIComponent(payload)], { type: mimeType || 'text/plain' });
+    }
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
+}
+
 export async function uploadMedicalFile(
   userId: string,
   fileUri: string,

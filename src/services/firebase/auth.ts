@@ -74,6 +74,19 @@ export async function resendVerification(): Promise<void> {
   await sendEmailVerification(auth.currentUser);
 }
 
+/**
+ * Re-reads the account so `emailVerified` reflects reality.
+ *
+ * onAuthStateChanged does NOT fire when someone clicks the verification link —
+ * the flag lives on the cached user object, so without this the banner survives
+ * verification until a full page reload or a fresh sign-in.
+ */
+export async function refreshEmailVerified(): Promise<boolean> {
+  if (!auth.currentUser) return false;
+  await auth.currentUser.reload();
+  return auth.currentUser.emailVerified;
+}
+
 export async function getUserProfile(uid: string): Promise<AppUser | null> {
   const snap = await getDoc(doc(db, 'users', uid));
   if (!snap.exists()) return null;

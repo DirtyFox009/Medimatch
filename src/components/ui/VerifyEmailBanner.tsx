@@ -1,19 +1,55 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, AppState } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
-import { resendVerification } from '../../services/firebase/auth';
+import { useAuthStore } from '../../store/authStore';
+import { resendVerification, refreshEmailVerified } from '../../services/firebase/auth';
+
+/** How often to re-check while the banner is up (it unmounts once verified). */
+const POLL_MS = 15000;
 
 /**
  * Non-blocking amber banner shown while the signed-in user's email is
  * unverified. Verification is encouraged, never required.
+ *
+ * Clicking the emailed link does not fire onAuthStateChanged, and
+ * `emailVerified` is cached on the user object — so the banner has to re-check
+ * for itself, or it survives verification until a full page reload. It checks
+ * on mount, whenever the app regains focus (the common case: the user clicks
+ * the link, then comes back), and on a slow poll for a link opened elsewhere.
  */
 export function VerifyEmailBanner() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const emailVerified = useAuthStore((s) => s.emailVerified);
+  const setEmailVerified = useAuthStore((s) => s.setEmailVerified);
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
 
-  if (!user || user.emailVerified) return null;
+  const recheck = useCallback(async () => {
+    try {
+      const verified = await refreshEmailVerified();
+      setEmailVerified(verified);
+    } catch {
+      // Offline or token expired — leave the banner up and try again later.
+    }
+  }, [setEmailVerified]);
+
+  const hidden = !user || emailVerified;
+
+  useEffect(() => {
+    if (hidden) return;
+    recheck();
+    const timer = setInterval(recheck, POLL_MS);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') recheck();
+    });
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, [hidden, recheck]);
+
+  if (hidden) return null;
 
   const handleResend = async () => {
     setStatus('sending');

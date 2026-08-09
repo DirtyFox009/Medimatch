@@ -15,6 +15,7 @@ import { uploadMedicalFile, FileTooLargeError, MAX_RECORD_FILE_BYTES } from '../
 import { useAuth } from '../../src/hooks/useAuth';
 import { usePatientPrescriptions } from '../../src/hooks/usePrescriptions';
 import { PrescriptionCard } from '../../src/components/prescriptions/PrescriptionCard';
+import { RecordFileModal } from '../../src/components/records/RecordFileModal';
 import { showAlert } from '../../src/utils/alert';
 import { ResponsiveContainer } from '../../src/components/layout/ResponsiveContainer';
 import type { MedicalRecord, RecordType } from '../../src/types/record';
@@ -48,6 +49,8 @@ export default function RecordsScreen() {
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  /** Record whose file is open in the viewer, or null. */
+  const [viewing, setViewing] = useState<MedicalRecord | null>(null);
 
   // Add-record modal state
   const [showModal, setShowModal] = useState(false);
@@ -240,21 +243,28 @@ export default function RecordsScreen() {
         }
         renderItem={({ item }) => (
           <Card className="p-4 flex-row items-start gap-3">
-            <View className="w-10 h-10 rounded-xl bg-slate-100 items-center justify-center">
-              <Ionicons name={TYPE_ICONS[item.type] as any} size={20} color="#64748B" />
-            </View>
-            <View className="flex-1 gap-0.5">
-              <Text className="font-semibold text-slate-800 text-sm" numberOfLines={1}>{item.title}</Text>
-              <Text className="text-slate-500 text-xs">
-                {item.date}
-                {item.doctorName ? ` · ${item.doctorName}` : ''}
-                {item.hospitalName ? ` · ${item.hospitalName}` : ''}
-              </Text>
-              {item.notes ? (
-                <Text className="text-slate-400 text-xs" numberOfLines={2}>{item.notes}</Text>
-              ) : null}
-              <Badge label={t(`records.${item.type}`)} color={TYPE_COLORS[item.type]} />
-            </View>
+            {/* Tapping the body opens the file; delete stays a separate target. */}
+            <TouchableOpacity
+              onPress={() => setViewing(item)}
+              className="flex-1 flex-row items-start gap-3"
+            >
+              <View className="w-10 h-10 rounded-xl bg-slate-100 items-center justify-center">
+                <Ionicons name={TYPE_ICONS[item.type] as any} size={20} color="#64748B" />
+              </View>
+              <View className="flex-1 gap-0.5">
+                <Text className="font-semibold text-slate-800 text-sm" numberOfLines={1}>{item.title}</Text>
+                <Text className="text-slate-500 text-xs">
+                  {item.date}
+                  {item.doctorName ? ` · ${item.doctorName}` : ''}
+                  {item.hospitalName ? ` · ${item.hospitalName}` : ''}
+                </Text>
+                {item.notes ? (
+                  <Text className="text-slate-400 text-xs" numberOfLines={2}>{item.notes}</Text>
+                ) : null}
+                <Badge label={t(`records.${item.type}`)} color={TYPE_COLORS[item.type]} />
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => handleDelete(item)} className="p-1">
               <Ionicons name="trash-outline" size={18} color="#EF4444" />
             </TouchableOpacity>
@@ -317,6 +327,8 @@ export default function RecordsScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      <RecordFileModal record={viewing} onClose={() => setViewing(null)} />
       </ResponsiveContainer>
     </SafeAreaView>
   );

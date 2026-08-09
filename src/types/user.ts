@@ -33,6 +33,8 @@ export interface AppUser {
   role: UserRole;
   /** Links a doctor account to its doctors/{doctorId} document. Null for patients. */
   doctorId: string | null;
+  /** When the notification list was last opened; anything newer is unread. */
+  notificationsSeenAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

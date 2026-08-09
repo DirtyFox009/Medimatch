@@ -87,6 +87,8 @@ export async function getUserProfile(uid: string): Promise<AppUser | null> {
     // patient can fill them in from the Profile tab.
     dateOfBirth: data.dateOfBirth ?? null,
     gender: data.gender ?? null,
+    // Never opened the notification list — everything reads as unread.
+    notificationsSeenAt: data.notificationsSeenAt ?? null,
   } as AppUser;
 }
 

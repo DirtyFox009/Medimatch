@@ -2,10 +2,11 @@ import React from 'react';
 import { Tabs, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { TouchableOpacity, Text } from 'react-native';
+import { TouchableOpacity, Text, View } from 'react-native';
 import i18n from '../../src/i18n';
 import { DesktopShell, type ShellNavItem } from '../../src/components/layout/DesktopShell';
 import { useIsDesktop } from '../../src/hooks/useIsDesktop';
+import { NotificationBell } from '../../src/components/notifications/NotificationBell';
 
 function LanguageToggle() {
   const { i18n: i18nHook } = useTranslation();
@@ -41,7 +42,12 @@ export default function DoctorLayout() {
         tabBarStyle: isDesktop
           ? { display: 'none' }
           : { borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingBottom: 4 },
-        headerRight: () => <LanguageToggle />,
+        headerRight: () => (
+          <View className="flex-row items-center">
+            <NotificationBell tint="#0D9488" />
+            <LanguageToggle />
+          </View>
+        ),
         headerStyle: { backgroundColor: '#fff' },
         headerTitleStyle: { fontWeight: '700', color: '#1E293B' },
       }}

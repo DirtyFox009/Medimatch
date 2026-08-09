@@ -7,6 +7,7 @@ import i18n from '../../i18n';
 import { useAuth } from '../../hooks/useAuth';
 import { signOut } from '../../services/firebase/auth';
 import { showAlert } from '../../utils/alert';
+import { NotificationBell } from '../notifications/NotificationBell';
 
 export interface ShellNavItem {
   key: string;
@@ -116,6 +117,7 @@ export function DesktopShell({
         <View className="h-[76px] flex-row items-center justify-between border-b border-slate-200 bg-white px-8">
           <Text className="text-xl font-bold text-slate-800">{title}</Text>
           <View className="flex-row items-center gap-4">
+            <NotificationBell tint={accent === 'teal' ? '#0D9488' : '#475569'} />
             <LanguagePill />
             <TouchableOpacity
               onPress={confirmLogout}

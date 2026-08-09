@@ -382,5 +382,13 @@
     "comment_placeholder": "Share your experience (optional)...",
     "submit": "Submit Review",
     "thanks": "Thank you for your feedback!"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "Nothing new",
+    "new_booking": "New booking",
+    "confirmed": "{{name}} confirmed your appointment",
+    "cancelled": "{{name}} cancelled your appointment",
+    "completed": "{{name}} marked your appointment complete"
   }
 }

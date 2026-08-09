@@ -153,7 +153,12 @@ service cloud.firestore {
       // Patient may only cancel; doctor may confirm/complete/cancel.
       allow update: if authed()
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['status', 'updatedAt', 'notes'])
+             .hasOnly(['status', 'updatedAt', 'notes', 'statusChangedBy'])
+        // statusChangedBy drives the notification feed's "was this me?" check,
+        // so it may only ever name the caller — otherwise either party could
+        // forge it and suppress the other's notification.
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['statusChangedBy'])
+            || request.resource.data.statusChangedBy == request.auth.uid)
         && (
           (resource.data.patientId == request.auth.uid
              && request.resource.data.status == 'cancelled')

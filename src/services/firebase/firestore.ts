@@ -435,6 +435,9 @@ export async function cancelAppointment(appointment: Appointment): Promise<void>
   const batch = writeBatch(db);
   batch.update(doc(db, 'appointments', appointment.id), {
     status: 'cancelled',
+    // Records who acted, so the notification feed can skip telling someone
+    // about a change they made themselves. The rules pin it to the caller.
+    statusChangedBy: auth.currentUser?.uid ?? '',
     updatedAt: serverTimestamp(),
   });
 
@@ -541,8 +544,14 @@ export async function updateAppointmentStatus(
 ): Promise<void> {
   await updateDoc(doc(db, 'appointments', appointmentId), {
     status,
+    statusChangedBy: auth.currentUser?.uid ?? '',
     updatedAt: serverTimestamp(),
   });
+}
+
+/** Timestamp the user last opened their notification list. */
+export async function markNotificationsSeen(uid: string): Promise<void> {
+  await updateDoc(doc(db, 'users', uid), { notificationsSeenAt: serverTimestamp() });
 }
 
 // ── Medical Records ───────────────────────────────────────────────────────────

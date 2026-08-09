@@ -9,6 +9,7 @@ import { DesktopShell, type ShellNavItem } from '../../src/components/layout/Des
 import { useIsDesktop } from '../../src/hooks/useIsDesktop';
 import { signOut } from '../../src/services/firebase/auth';
 import { showAlert } from '../../src/utils/alert';
+import { NotificationBell } from '../../src/components/notifications/NotificationBell';
 
 function LanguageToggle() {
   const { i18n: i18nHook } = useTranslation();
@@ -80,6 +81,7 @@ export default function TabsLayout() {
         headerRight: () => (
           <View className="flex-row items-center">
             <EmergencyButton />
+            <NotificationBell />
             <LanguageToggle />
             <LogoutButton />
           </View>

@@ -30,7 +30,18 @@ export async function streamChatCompletion(
   });
 
   if (res.status === 429) throw new Error('rate_limit');
-  if (!res.ok) throw new Error(`groq_proxy_error_${res.status}`);
+  if (!res.ok) {
+    // Carry the proxy's diagnosis into the thrown error so the real cause
+    // survives to the logs instead of being flattened into "connection error".
+    let detail = '';
+    try {
+      const body = (await res.json()) as { upstreamStatus?: number; upstreamCode?: string };
+      if (body?.upstreamCode) detail = ` (upstream ${body.upstreamStatus ?? '?'} ${body.upstreamCode})`;
+    } catch {
+      // Proxy returned a non-JSON error; the status alone will have to do.
+    }
+    throw new Error(`groq_proxy_error_${res.status}${detail}`);
+  }
   if (!res.body) throw new Error('groq_proxy_no_stream');
 
   const reader = res.body.getReader();

@@ -23,7 +23,7 @@ A cross-platform (iOS / Android / Web) healthcare app for Bangladesh. Patients c
 | Styling | NativeWind 4 (Tailwind CSS for RN) |
 | State | Zustand 5 |
 | Backend | Firebase 12 — Auth, Firestore |
-| AI | Groq (`llama-3.3-70b-versatile`) via a Vercel serverless proxy |
+| AI | Groq (`openai/gpt-oss-120b`) via a Vercel serverless proxy |
 | Maps | React-Leaflet (web) / WebView fallback (native) |
 | Forms | React Hook Form |
 | i18n | i18next + react-i18next (English + Bengali) |

@@ -52,10 +52,20 @@ export function useGroqChat() {
           updateLastAssistantMessage(stripTriageJson(fullContent));
         }
       } catch (err: unknown) {
-        const errMsg =
-          err instanceof Error && err.message.includes('rate_limit')
-            ? 'Too many requests. Please wait a moment and try again.'
-            : 'Connection error. Please check your internet and try again.';
+        const reason = err instanceof Error ? err.message : 'unknown_error';
+        // The user-facing copy is deliberately vague, so make sure the real
+        // cause reaches somewhere a developer can actually read it.
+        console.warn('[triage] chat completion failed:', reason);
+        let errMsg: string;
+        if (reason.includes('rate_limit')) {
+          errMsg = 'Too many requests. Please wait a moment and try again.';
+        } else if (reason.includes('groq_proxy_error')) {
+          // The request reached the proxy and it answered — blaming the user's
+          // connection here is what hid an upstream outage for four days.
+          errMsg = 'The AI assistant is unavailable right now. Please try again later.';
+        } else {
+          errMsg = 'Connection error. Please check your internet and try again.';
+        }
         updateLastAssistantMessage(errMsg);
       } finally {
         setStreaming(false);

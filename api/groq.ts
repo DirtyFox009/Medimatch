@@ -7,7 +7,9 @@ import { TRIAGE_SYSTEM_PROMPT } from './_prompts';
 export const config = { runtime: 'edge' };
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+// llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16; requests to
+// it now fail upstream. This is Groq's named replacement.
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 const MAX_MESSAGES = 24;
 const MAX_MESSAGE_CHARS = 4000;
 
@@ -77,7 +79,12 @@ export default async function handler(req: Request): Promise<Response> {
     body: JSON.stringify({
       model: GROQ_MODEL,
       messages: [{ role: 'system', content: TRIAGE_SYSTEM_PROMPT }, ...messages],
-      max_tokens: 1024,
+      // A reasoning model spends completion budget on reasoning tokens before
+      // it emits any content, so leave headroom — a truncated reply loses the
+      // trailing JSON block that parseTriageResult depends on.
+      max_completion_tokens: 2048,
+      reasoning_effort: 'low',
+      include_reasoning: false,
       temperature: 0.4,
       stream: true,
     }),
@@ -85,8 +92,21 @@ export default async function handler(req: Request): Promise<Response> {
 
   if (!upstream.ok || !upstream.body) {
     // Pass Groq's status through (429 lets clients show their rate-limit copy)
-    // without leaking upstream error details.
-    return jsonResponse(upstream.status === 429 ? 429 : 502, { error: 'upstream_error' });
+    // and name the failure. The error *code* is operational, not sensitive —
+    // without it a decommissioned model, a revoked key and a dead network are
+    // indistinguishable downstream. Upstream message bodies still never escape.
+    let upstreamCode = 'unknown';
+    try {
+      const detail = (await upstream.json()) as { error?: { code?: string; type?: string } };
+      upstreamCode = detail?.error?.code ?? detail?.error?.type ?? 'unknown';
+    } catch {
+      // Non-JSON upstream error (gateway HTML, empty body) — keep 'unknown'.
+    }
+    return jsonResponse(upstream.status === 429 ? 429 : 502, {
+      error: 'upstream_error',
+      upstreamStatus: upstream.status,
+      upstreamCode,
+    });
   }
 
   return new Response(upstream.body, {
